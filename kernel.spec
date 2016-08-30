@@ -361,17 +361,12 @@ Release: %{pkg_release}
 # SET %%nobuildarches (ABOVE) INSTEAD
 ExclusiveArch: %{all_x86} x86_64 ppc64 ppc64p7 s390 s390x %{arm} aarch64 ppc64le
 ExclusiveOS: Linux
-%ifnarch %{nobuildarches}
-Requires: kernel-core-uname-r = %{KVERREL}%{?variant}
-Requires: kernel-modules-uname-r = %{KVERREL}%{?variant}
-%endif
-
 
 #
 # List the packages used during the kernel build
 #
 BuildRequires: kmod, patch, bash, sh-utils, tar, git
-BuildRequires: bzip2, xz, findutils, gzip, m4, perl, perl-Carp, perl-devel, perl-generators, make, diffutils, gawk
+BuildRequires: bzip2, xz, findutils, gzip, m4, perl, perl-Carp, perl-devel, make, diffutils, gawk
 BuildRequires: gcc, binutils, redhat-rpm-config, hmaccalc
 BuildRequires: net-tools, hostname, bc
 %if %{with_sparse}
