@@ -5,11 +5,8 @@
 %global signmodules 1
 %global zipmodules 1
 
-%define with_debug 0
 %define with_headers 1
-%define with_cross_headers 0
 %define with_perf 0
-%define with_debuginfo 0
 
 Summary: The Linux kernel
 
@@ -93,19 +90,8 @@ Summary: The Linux kernel
 %define variant -vanilla
 %endif
 
-%if !%{debugbuildsenabled}
-%define with_debug 0
-%endif
-
-%if !%{with_debuginfo}
 %define _enable_debug_packages 0
-%endif
 %define debuginfodir /usr/lib/debug
-
-# if requested, only build base kernel
-%if %{with_baseonly}
-%define with_debug 0
-%endif
 
 %define all_x86 i386 i686
 
@@ -116,16 +102,10 @@ Summary: The Linux kernel
 
 # Overrides for generic default options
 
-# don't do debug builds on anything but i686 and x86_64
-%ifnarch i686 x86_64
-%define with_debug 0
-%endif
-
 # don't build noarch kernels or headers (duh)
 %ifarch noarch
 %define with_up 0
 %define with_headers 0
-%define with_cross_headers 0
 %define with_tools 0
 %define with_perf 0
 %define all_arch_configs kernel-%{version}-*.config
@@ -154,56 +134,6 @@ Summary: The Linux kernel
 %define kernel_image arch/x86/boot/bzImage
 %endif
 
-%ifarch %{power64}
-%define asmarch powerpc
-%define hdrarch powerpc
-%define make_target vmlinux
-%define kernel_image vmlinux
-%define kernel_image_elf 1
-%ifarch ppc64 ppc64p7
-%define all_arch_configs kernel-%{version}-ppc64*.config
-%endif
-%ifarch ppc64le
-%define all_arch_configs kernel-%{version}-ppc64le*.config
-%endif
-%endif
-
-%ifarch s390x
-%define asmarch s390
-%define hdrarch s390
-%define all_arch_configs kernel-%{version}-s390x.config
-%define make_target image
-%define kernel_image arch/s390/boot/image
-%define with_tools 0
-%endif
-
-%ifarch %{arm}
-%define all_arch_configs kernel-%{version}-arm*.config
-%define asmarch arm
-%define hdrarch arm
-%define pae lpae
-%define make_target bzImage
-%define kernel_image arch/arm/boot/zImage
-# http://lists.infradead.org/pipermail/linux-arm-kernel/2012-March/091404.html
-%define kernel_mflags KALLSYMS_EXTRA_PASS=1
-# we only build headers/perf/tools on the base arm arches
-# just like we used to only build them on i386 for x86
-%ifnarch armv7hl
-%define with_headers 0
-%define with_cross_headers 0
-%define with_perf 0
-%define with_tools 0
-%endif
-%endif
-
-%ifarch aarch64
-%define all_arch_configs kernel-%{version}-aarch64*.config
-%define asmarch arm64
-%define hdrarch arm64
-%define make_target Image.gz
-%define kernel_image arch/arm64/boot/Image.gz
-%endif
-
 # Should make listnewconfig fail if there's config options
 # printed out?
 %if %{nopatches}
@@ -223,7 +153,6 @@ Summary: The Linux kernel
 
 %ifarch %nobuildarches
 %define with_up 0
-%define with_debuginfo 0
 %define with_perf 0
 %define with_tools 0
 %define _enable_debug_packages 0
@@ -272,10 +201,6 @@ BuildRequires: numactl-devel
 BuildRequires: pciutils-devel gettext ncurses-devel
 %endif
 BuildConflicts: rhbuildsys(DiskFree) < 500Mb
-%if %{with_debuginfo}
-BuildRequires: rpm-build, elfutils
-%define debuginfo_args --strict-build-id -r
-%endif
 
 %if %{signkernel}%{signmodules}
 BuildRequires: openssl openssl-devel
@@ -948,18 +873,6 @@ cd ..
 %define sparse_mflags	C=1
 %endif
 
-%if %{with_debuginfo}
-# This override tweaks the kernel makefiles so that we run debugedit on an
-# object before embedding it.  When we later run find-debuginfo.sh, it will
-# run debugedit again.  The edits it does change the build ID bits embedded
-# in the stripped object, but repeating debugedit is a no-op.  We do it
-# beforehand to get the proper final build ID bits into the embedded image.
-# This affects the vDSO images in vmlinux, and the vmlinux image in bzImage.
-export AFTER_LINK=\
-'sh -xc "/usr/lib/rpm/debugedit -b $$RPM_BUILD_DIR -d /usr/src/debug \
-    				-i $@ > $@.id"'
-%endif
-
 cp_vmlinux()
 {
   eu-strip --remove-comment -o "$2" "$1"
@@ -1020,9 +933,6 @@ BuildKernel() {
 
     mkdir -p $RPM_BUILD_ROOT/%{image_install_path}
     mkdir -p $RPM_BUILD_ROOT/lib/modules/$KernelVer
-%if %{with_debuginfo}
-    mkdir -p $RPM_BUILD_ROOT%{debuginfodir}/%{image_install_path}
-%endif
 
 %ifarch %{arm} aarch64
     %{make} -s ARCH=$Arch V=1 dtbs dtbs_install INSTALL_DTBS_PATH=$RPM_BUILD_ROOT/%{image_install_path}/dtb-$KernelVer
@@ -1170,21 +1080,6 @@ BuildKernel() {
     # Copy .config to include/config/auto.conf so "make prepare" is unnecessary.
     cp $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/.config $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/include/config/auto.conf
 
-%if %{with_debuginfo}
-    if test -s vmlinux.id; then
-      cp vmlinux.id $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/vmlinux.id
-    else
-      echo >&2 "*** ERROR *** no vmlinux build ID! ***"
-      exit 1
-    fi
-
-    #
-    # save the vmlinux file for kernel debugging into the kernel-debuginfo rpm
-    #
-    mkdir -p $RPM_BUILD_ROOT%{debuginfodir}/lib/modules/$KernelVer
-    cp vmlinux $RPM_BUILD_ROOT%{debuginfodir}/lib/modules/$KernelVer
-%endif
-
     find $RPM_BUILD_ROOT/lib/modules/$KernelVer -name "*.ko" -type f >modnames
 
     # mark modules executable so that strip-to-file can strip them
@@ -1312,10 +1207,6 @@ mkdir -p $RPM_BUILD_ROOT%{_libexecdir}
 
 cd linux-%{KVERREL}
 
-%if %{with_debug}
-BuildKernel %make_target %kernel_image debug
-%endif
-
 %if %{with_up}
 BuildKernel %make_target %kernel_image
 %endif
@@ -1370,9 +1261,6 @@ popd
 
 %define __modsign_install_post \
   if [ "%{signmodules}" -eq "1" ]; then \
-    if [ "%{with_debug}" -ne "0" ]; then \
-      %{modsign_cmd} certs/signing_key.pem.sign+debug certs/signing_key.x509.sign+debug $RPM_BUILD_ROOT/lib/modules/%{KVERREL}+debug/ \
-    fi \
     if [ "%{with_up}" -ne "0" ]; then \
       %{modsign_cmd} certs/signing_key.pem.sign certs/signing_key.x509.sign $RPM_BUILD_ROOT/lib/modules/%{KVERREL}/ \
     fi \
@@ -1388,20 +1276,6 @@ popd
 
 # This macro is used by %%install, so we must redefine it before that.
 %define debug_package %{nil}
-
-%if %{with_debuginfo}
-
-%define __debug_install_post \
-  /usr/lib/rpm/find-debuginfo.sh %{debuginfo_args} %{_builddir}/%{?buildsubdir}\
-%{nil}
-
-%ifnarch noarch
-%global __debug_package 1
-%files -f debugfiles.list debuginfo-common-%{_target_cpu}
-%defattr(-,root,root)
-%endif
-
-%endif
 
 #
 # Disgusting hack alert! We need to ensure we sign modules *after* all
@@ -1604,12 +1478,6 @@ fi
 /usr/include/*
 %endif
 
-%if %{with_cross_headers}
-%files cross-headers
-%defattr(-,root,root)
-/usr/*-linux-gnu/include/*
-%endif
-
 %if %{with_bootwrapper}
 %files bootwrapper
 %defattr(-,root,root)
@@ -1634,13 +1502,6 @@ fi
 %defattr(-,root,root)
 %{python_sitearch}
 
-%if %{with_debuginfo}
-%files -f perf-debuginfo.list -n perf-debuginfo
-%defattr(-,root,root)
-
-%files -f python-perf-debuginfo.list -n python-perf-debuginfo
-%defattr(-,root,root)
-%endif
 %endif # with_perf
 
 %if %{with_tools}
@@ -1662,11 +1523,6 @@ fi
 %{_mandir}/man8/turbostat*
 %endif
 %{_bindir}/tmon
-%endif
-
-%if %{with_debuginfo}
-%files -f kernel-tools-debuginfo.list -n kernel-tools-debuginfo
-%defattr(-,root,root)
 %endif
 
 %ifarch %{cpupowerarchs}
@@ -1732,12 +1588,6 @@ fi
 %{expand:%%files %{?2:%{2}-}modules-extra}\
 %defattr(-,root,root)\
 /lib/modules/%{KVERREL}%{?2:+%{2}}/extra\
-%if %{with_debuginfo}\
-%ifnarch noarch\
-%{expand:%%files -f debuginfo%{?2}.list %{?2:%{2}-}debuginfo}\
-%defattr(-,root,root)\
-%endif\
-%endif\
 %if %{?2:1} %{!?2:0}\
 %{expand:%%files %{2}}\
 %defattr(-,root,root)\
@@ -1747,4 +1597,3 @@ fi
 
 
 %kernel_variant_files %{with_up}
-%kernel_variant_files %{with_debug} debug
