@@ -1,79 +1,38 @@
-# We have to override the new %%install behavior because, well... the kernel is special.
 %global __spec_install_pre %{___build_pre}
 
-Summary: The Linux kernel
-
-# For a stable, released kernel, released_kernel should be 1. For rawhide
-# and/or a kernel built from an rc or git snapshot, released_kernel should
-# be 0.
 %global released_kernel 1
-
-# Sign modules on x86.  Make sure the config files match this setting if more
-# architectures are added.
-%ifarch %{ix86} x86_64
 %global signkernel 1
 %global signmodules 1
 %global zipmodules 1
-%else
-%global signkernel 0
-%global signmodules 1
-%global zipmodules 0
-%endif
 
-%if %{zipmodules}
+%define with_debug 0
+%define with_headers 1
+%define with_cross_headers 0
+%define with_perf 0
+%define with_debuginfo 0
+
+Summary: The Linux kernel
+
 %global zipsed -e 's/\.ko$/\.ko.xz/'
-%endif
 
-# define buildid .local
-
-# baserelease defines which build revision of this kernel version we're
-# building.  We used to call this fedora_build, but the magical name
-# baserelease is matched by the rpmdev-bumpspec tool, which you should use.
-#
-# We used to have some extra magic weirdness to bump this automatically,
-# but now we don't.  Just use: rpmdev-bumpspec -c 'comment for changelog'
-# When changing base_sublevel below or going from rc to a final kernel,
-# reset this by hand to 1 (or to 0 and then use rpmdev-bumpspec).
-# scripts/rebase.sh should be made to do that for you, actually.
-#
-# NOTE: baserelease must be > 0 or bad things will happen if you switch
-#       to a released kernel (released version will be < rc version)
-#
-# For non-released -rc kernels, this will be appended after the rcX and
-# gitX tags, so a 3 here would become part of release "0.rcX.gitX.3"
-#
+# Must be > 0, increment upon build using `rpmdev-bumpspec -c 'comment for
+# changelog'`. When changing base_sublevel reset this to 1.
 %global baserelease 201
 %global fedora_build %{baserelease}
 
-# base_sublevel is the kernel version we're starting with and patching
-# on top of -- for example, 3.1-rc7-git1 starts with a 3.0 base,
-# which yields a base_sublevel of 0.
+# base_sublevel is the kernel version we're starting with and patching. Kernel
+# 3.1-rc7-git1 starts with a 3.0 base, so base_sublevel would be 0.
 %define base_sublevel 7
-
-## If this is a released kernel ##
-%if 0%{?released_kernel}
 
 # Do we have a -stable update to apply?
 %define stable_update 2
-# Set rpm version accordingly
-%if 0%{?stable_update}
 %define stablerev %{stable_update}
 %define stable_base %{stable_update}
-%endif
+
 %define rpmversion 4.%{base_sublevel}.%{stable_update}
 
-## The not-released-kernel case ##
-%else
-# The next upstream release sublevel (base_sublevel+1)
-%define upstream_sublevel %(echo $((%{base_sublevel} + 1)))
-# The rc snapshot level
-%define rcrev 0
-# The git snapshot level
-%define gitrev 0
-# Set rpm version accordingly
-%define rpmversion 4.%{upstream_sublevel}.0
-%endif
-# Nb: The above rcrev and gitrev values automagically define Patch00 and Patch01 below.
+# Nb: The above rcrev and gitrev values automagically define Patch00 and
+# Patch01 below.
 
 # What parts do we want to build?  We must build at least one kernel.
 # These are the kernels that are built IF the architecture allows it.
@@ -84,70 +43,32 @@ Summary: The Linux kernel
 # Use either --without <opt> in your rpmbuild command or force values
 # to 0 in here to disable them.
 #
+%define with_tools     %{?_without_tools:     0} %{?!_without_tools:     1}
 # standard kernel
 %define with_up        %{?_without_up:        0} %{?!_without_up:        1}
-# kernel PAE (only valid for i686 (PAE) and ARM (lpae))
-%define with_pae       %{?_without_pae:       0} %{?!_without_pae:       1}
-# kernel-debug
-%define with_debug     %{?_without_debug:     0} %{?!_without_debug:     1}
-# kernel-headers
-%define with_headers   %{?_without_headers:   0} %{?!_without_headers:   1}
-%define with_cross_headers   %{?_without_cross_headers:   0} %{?!_without_cross_headers:   1}
-# perf
-%define with_perf      %{?_without_perf:      0} %{?!_without_perf:      1}
-# tools
-%define with_tools     %{?_without_tools:     0} %{?!_without_tools:     1}
-# kernel-debuginfo
-%define with_debuginfo %{?_without_debuginfo: 0} %{?!_without_debuginfo: 1}
 # kernel-bootwrapper (for creating zImages from kernel + initrd)
 %define with_bootwrapper %{?_without_bootwrapper: 0} %{?!_without_bootwrapper: 1}
-# Want to build a the vsdo directories installed
+# Want to build with the vsdo directories installed
 %define with_vdso_install %{?_without_vdso_install: 0} %{?!_without_vdso_install: 1}
-#
+
 # Additional options for user-friendly one-off kernel building:
 #
 # Only build the base kernel (--with baseonly):
 %define with_baseonly  %{?_with_baseonly:     1} %{?!_with_baseonly:     0}
-# Only build the pae kernel (--with paeonly):
-%define with_paeonly   %{?_with_paeonly:      1} %{?!_with_paeonly:      0}
-# Only build the debug kernel (--with dbgonly):
-%define with_dbgonly   %{?_with_dbgonly:      1} %{?!_with_dbgonly:      0}
 #
 # should we do C=1 builds with sparse
 %define with_sparse    %{?_with_sparse:       1} %{?!_with_sparse:       0}
-#
-# Cross compile requested?
-%define with_cross    %{?_with_cross:         1} %{?!_with_cross:        0}
+%define with_cross 0
 #
 # build a release kernel on rawhide
 %define with_release   %{?_with_release:      1} %{?!_with_release:      0}
 
-%define debugbuildsenabled 1
+%define debugbuildsenabled 0
 
 # Want to build a vanilla kernel build without any non-upstream patches?
 %define with_vanilla %{?_with_vanilla: 1} %{?!_with_vanilla: 0}
 
-# pkg_release is what we'll fill in for the rpm Release: field
-%if 0%{?released_kernel}
-
 %define pkg_release %{fedora_build}%{?buildid}%{?dist}
-
-%else
-
-# non-released_kernel
-%if 0%{?rcrev}
-%define rctag .rc%rcrev
-%else
-%define rctag .rc0
-%endif
-%if 0%{?gitrev}
-%define gittag .git%gitrev
-%else
-%define gittag .git0
-%endif
-%define pkg_release 0%{?rctag}%{?gittag}.%{fedora_build}%{?buildid}%{?dist}
-
-%endif
 
 # The kernel tarball/base version
 %define kversion 4.%{base_sublevel}
@@ -181,32 +102,9 @@ Summary: The Linux kernel
 %endif
 %define debuginfodir /usr/lib/debug
 
-# kernel PAE is only built on i686 and ARMv7.
-%ifnarch i686 armv7hl
-%define with_pae 0
-%endif
-
 # if requested, only build base kernel
 %if %{with_baseonly}
-%define with_pae 0
 %define with_debug 0
-%endif
-
-# if requested, only build pae kernel
-%if %{with_paeonly}
-%define with_up 0
-%define with_debug 0
-%endif
-
-# if requested, only build debug kernel
-%if %{with_dbgonly}
-%if %{debugbuildsenabled}
-%define with_up 0
-%define with_pae 0
-%endif
-%define with_pae 0
-%define with_tools 0
-%define with_perf 0
 %endif
 
 %define all_x86 i386 i686
@@ -325,16 +223,10 @@ Summary: The Linux kernel
 
 %ifarch %nobuildarches
 %define with_up 0
-%define with_pae 0
 %define with_debuginfo 0
 %define with_perf 0
 %define with_tools 0
 %define _enable_debug_packages 0
-%endif
-
-%define with_pae_debug 0
-%if %{with_pae}
-%define with_pae_debug %{with_debug}
 %endif
 
 # Architectures we build tools/cpupower on
@@ -392,11 +284,6 @@ BuildRequires: pesign >= 0.10-4
 %endif
 %endif
 
-%if %{with_cross}
-BuildRequires: binutils-%{_build_arch}-linux-gnu, gcc-%{_build_arch}-linux-gnu
-%define cross_opts CROSS_COMPILE=%{_build_arch}-linux-gnu-
-%endif
-
 Source0: ftp://ftp.kernel.org/pub/linux/kernel/v4.x/linux-%{kversion}.tar.xz
 
 Source10: perf-man-%{kversion}.tar.gz
@@ -406,45 +293,18 @@ Source15: merge.pl
 Source16: mod-extra.list
 Source17: mod-extra.sh
 Source18: mod-sign.sh
-Source90: filter-x86_64.sh
-Source91: filter-armv7hl.sh
-Source92: filter-i686.sh
-Source93: filter-aarch64.sh
-Source95: filter-ppc64.sh
-Source96: filter-ppc64le.sh
-Source97: filter-s390x.sh
-Source98: filter-ppc64p7.sh
 Source99: filter-modules.sh
 %define modsign_cmd %{SOURCE18}
 
 Source19: Makefile.release
-Source20: Makefile.config
+Source20: Makefile
 Source21: config-debug
 Source22: config-nodebug
 Source23: config-generic
 Source24: config-no-extra
 
 Source30: config-x86-generic
-Source31: config-i686-PAE
-Source32: config-x86-32-generic
-
 Source40: config-x86_64-generic
-
-Source50: config-powerpc64-generic
-Source53: config-powerpc64
-Source54: config-powerpc64p7
-Source55: config-powerpc64le
-
-Source70: config-s390x
-
-Source100: config-arm-generic
-
-# Unified ARM kernels
-Source101: config-armv7-generic
-Source102: config-armv7
-Source103: config-armv7-lpae
-
-Source110: config-arm64
 
 # This file is intentionally left empty in the stock kernel. Its a nicety
 # added for those wanting to do custom rebuilds with altered config opts.
@@ -483,173 +343,19 @@ Source5000: patch-4.%{base_sublevel}-git%{gitrev}.xz
 # build tweak for build ID magic, even for -vanilla
 Source5005: kbuild-AFTER_LINK.patch
 
-%if !%{nopatches}
-
-# Git trees.
-
-# Standalone patches
-
-Patch420: arm64-avoid-needing-console-to-enable-serial-console.patch
-
-# http://www.spinics.net/lists/arm-kernel/msg490981.html
-Patch422: geekbox-v4-device-tree-support.patch
-
-Patch424: arm64-pcie-acpi.patch
-Patch425: arm64-pcie-quirks-xgene.patch
-
-# http://www.spinics.net/lists/linux-tegra/msg26029.html
-Patch426: usb-phy-tegra-Add-38.4MHz-clock-table-entry.patch
-
-# http://patchwork.ozlabs.org/patch/587554/
-Patch430: ARM-tegra-usb-no-reset.patch
-
-Patch431: bcm2837-initial-support.patch
-
-Patch432: arm-i.MX6-Utilite-device-dtb.patch
-
-Patch460: lib-cpumask-Make-CPUMASK_OFFSTACK-usable-without-deb.patch
-
-Patch466: input-kill-stupid-messages.patch
-
-Patch467: die-floppy-die.patch
-
-Patch468: no-pcspkr-modalias.patch
-
-Patch470: silence-fbcon-logo.patch
-
-Patch471: Kbuild-Add-an-option-to-enable-GCC-VTA.patch
-
-Patch472: crash-driver.patch
-
-Patch473: Add-secure_modules-call.patch
-
-Patch474: PCI-Lock-down-BAR-access-when-module-security-is-ena.patch
-
-Patch475: x86-Lock-down-IO-port-access-when-module-security-is.patch
-
-Patch476: ACPI-Limit-access-to-custom_method.patch
-
-Patch477: asus-wmi-Restrict-debugfs-interface-when-module-load.patch
-
-Patch478: Restrict-dev-mem-and-dev-kmem-when-module-loading-is.patch
-
-Patch479: acpi-Ignore-acpi_rsdp-kernel-parameter-when-module-l.patch
-
-Patch480: kexec-Disable-at-runtime-if-the-kernel-enforces-modu.patch
-
-Patch481: x86-Restrict-MSR-access-when-module-loading-is-restr.patch
-
-Patch482: Add-option-to-automatically-enforce-module-signature.patch
-
-Patch483: efi-Disable-secure-boot-if-shim-is-in-insecure-mode.patch
-
-Patch485: efi-Add-EFI_SECURE_BOOT-bit.patch
-
-Patch486: hibernate-Disable-in-a-signed-modules-environment.patch
-
-Patch487: Add-EFI-signature-data-types.patch
-
-Patch488: Add-an-EFI-signature-blob-parser-and-key-loader.patch
-
-# This doesn't apply. It seems like it could be replaced by
-# https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=5ac7eace2d00eab5ae0e9fdee63e38aee6001f7c
-# which has an explicit line about blacklisting
-Patch489: KEYS-Add-a-system-blacklist-keyring.patch
-
-Patch490: MODSIGN-Import-certificates-from-UEFI-Secure-Boot.patch
-
-Patch491: MODSIGN-Support-not-importing-certs-from-db.patch
-
-Patch492: Add-sysrq-option-to-disable-secure-boot-mode.patch
-
-Patch493: drm-i915-hush-check-crtc-state.patch
-
-Patch494: disable-i8042-check-on-apple-mac.patch
-
-Patch495: lis3-improve-handling-of-null-rate.patch
-
-Patch496: watchdog-Disable-watchdog-on-virtual-machines.patch
-
-Patch497: scsi-sd_revalidate_disk-prevent-NULL-ptr-deref.patch
-
-Patch498: criu-no-expert.patch
-
-Patch499: ath9k-rx-dma-stop-check.patch
-
-Patch500: xen-pciback-Don-t-disable-PCI_COMMAND-on-PCI-device-.patch
-
-Patch501: Input-synaptics-pin-3-touches-when-the-firmware-repo.patch
-
-Patch502: firmware-Drop-WARN-from-usermodehelper_read_trylock-.patch
-
-# Patch503: drm-i915-turn-off-wc-mmaps.patch
-
-Patch508: kexec-uefi-copy-secure_boot-flag-in-boot-params.patch
-
-#Required for some persistent memory options
-Patch641: disable-CONFIG_EXPERT-for-ZONE_DMA.patch
-
-#CVE-2016-3134 rhbz 1317383 1317384
-Patch665: netfilter-x_tables-deal-with-bogus-nextoffset-values.patch
-
-#skl_update_other_pipe_wm issue patch-series from drm-next, rhbz 1305038
-Patch801: 0001-drm-i915-Reorganize-WM-structs-unions-in-CRTC-state.patch
-Patch802: 0002-drm-i915-Rename-s-skl_compute_pipe_wm-skl_build_pipe.patch
-Patch803: 0003-drm-i915-gen9-Cache-plane-data-rates-in-CRTC-state.patch
-Patch804: 0004-drm-i915-gen9-Allow-calculation-of-data-rate-for-in-.patch
-Patch805: 0005-drm-i915-gen9-Store-plane-minimum-blocks-in-CRTC-wm-.patch
-Patch806: 0006-drm-i915-Track-whether-an-atomic-transaction-changes.patch
-Patch807: 0007-drm-i915-gen9-Allow-skl_allocate_pipe_ddb-to-operate.patch
-Patch808: 0008-drm-i915-Add-distrust_bios_wm-flag-to-dev_priv-v2.patch
-Patch809: 0009-drm-i915-gen9-Compute-DDB-allocation-at-atomic-check.patch
-Patch810: 0010-drm-i915-gen9-Drop-re-allocation-of-DDB-at-atomic-co.patch
-Patch811: 0011-drm-i915-gen9-Calculate-plane-WM-s-from-state.patch
-Patch812: 0012-drm-i915-gen9-Allow-watermark-calculation-on-in-flig.patch
-Patch813: 0013-drm-i915-gen9-Use-a-bitmask-to-track-dirty-pipe-wate.patch
-Patch814: 0014-drm-i915-gen9-Propagate-watermark-calculation-failur.patch
-Patch815: 0015-drm-i915-gen9-Calculate-watermarks-during-atomic-che.patch
-Patch816: 0016-drm-i915-gen9-Reject-display-updates-that-exceed-wm-.patch
-Patch817: 0017-drm-i915-Remove-wm_config-from-dev_priv-intel_atomic.patch
-
-# https://lists.fedoraproject.org/archives/list/kernel@lists.fedoraproject.org/message/A4YCP7OGMX6JLFT5V44H57GOMAQLC3M4/
-Patch838: drm-i915-Acquire-audio-powerwell-for-HD-Audio-regist.patch
-
-#rhbz 1353558
-Patch844: 0001-selinux-Only-apply-bounds-checking-to-source-types.patch
-
-#CVE-2016-6480 rhbz 1362466 1362467
-Patch855: aacraid-Check-size-values-after-double-fetch-from-us.patch
-
-#rhbz 1365940
-Patch856: 0001-udp-fix-poll-issue-with-zero-sized-packets.patch
-
-#rhbz 13700161
-Patch857: kernel-panic-TPROXY-vanilla-4.7.1.patch
-
-# lkml.kernel.org/r/<20160822093249.GA14916@dhcp22.suse.cz>
-Patch858: 0001-OOM-detection-regressions-since-4.7.patch
-
-#rhbz 1360688
-Patch859: rc-core-fix-repeat-events.patch
-
-#rhbz 1371237
-Patch860: 0001-SUNRPC-Fix-infinite-looping-in-rpc_clnt_iterate_for_.patch
-
-# END OF PATCH DEFINITIONS
-
-%endif
-
 BuildRoot: %{_tmppath}/kernel-%{KVERREL}-root
 
 %description
 The kernel meta package
 
+# This macro does requires, provides, conflicts, obsoletes for a kernel
+# package.
 #
-# This macro does requires, provides, conflicts, obsoletes for a kernel package.
-#	%%kernel_reqprovconf <subpackage>
+#   %%kernel_reqprovconf <subpackage>
+#
 # It uses any kernel_<subpackage>_conflicts and kernel_<subpackage>_obsoletes
 # macros defined above.
-#
+
 %define kernel_reqprovconf \
 Provides: kernel = %{rpmversion}-%{pkg_release}\
 Provides: kernel-%{_target_cpu} = %{rpmversion}-%{pkg_release}%{?1:+%{1}}\
@@ -990,64 +696,11 @@ input and output, etc.
 
 
 %prep
-# do a few sanity-checks for --with *only builds
-%if %{with_baseonly}
-%if !%{with_up}%{with_pae}
-echo "Cannot build --with baseonly, up build is disabled"
-exit 1
-%endif
-%endif
 
 %if "%{baserelease}" == "0"
 echo "baserelease must be greater than zero"
 exit 1
 %endif
-
-# more sanity checking; do it quietly
-if [ "%{patches}" != "%%{patches}" ] ; then
-  for patch in %{patches} ; do
-    if [ ! -f $patch ] ; then
-      echo "ERROR: Patch  ${patch##/*/}  listed in specfile but is missing"
-      exit 1
-    fi
-  done
-fi 2>/dev/null
-
-patch_command='patch -p1 -F1 -s'
-ApplyPatch()
-{
-  local patch=$1
-  shift
-  if [ ! -f $RPM_SOURCE_DIR/$patch ]; then
-    exit 1
-  fi
-  if ! grep -E "^Patch[0-9]+: $patch\$" %{_specdir}/${RPM_PACKAGE_NAME%%%%%{?variant}}.spec ; then
-    if [ "${patch:0:8}" != "patch-4." ] ; then
-      echo "ERROR: Patch  $patch  not listed as a source patch in specfile"
-      exit 1
-    fi
-  fi 2>/dev/null
-  case "$patch" in
-  *.bz2) bunzip2 < "$RPM_SOURCE_DIR/$patch" | $patch_command ${1+"$@"} ;;
-  *.gz)  gunzip  < "$RPM_SOURCE_DIR/$patch" | $patch_command ${1+"$@"} ;;
-  *.xz)  unxz    < "$RPM_SOURCE_DIR/$patch" | $patch_command ${1+"$@"} ;;
-  *) $patch_command ${1+"$@"} < "$RPM_SOURCE_DIR/$patch" ;;
-  esac
-}
-
-# don't apply patch if it's empty
-ApplyOptionalPatch()
-{
-  local patch=$1
-  shift
-  if [ ! -f $RPM_SOURCE_DIR/$patch ]; then
-    exit 1
-  fi
-  local C=$(wc -l $RPM_SOURCE_DIR/$patch | awk '{print $1}')
-  if [ "$C" -gt 9 ]; then
-    ApplyPatch $patch ${1+"$@"}
-  fi
-}
 
 # First we unpack the kernel tarball.
 # If this isn't the first make prep, we use links to the existing clean tarball
@@ -1663,14 +1316,6 @@ cd linux-%{KVERREL}
 BuildKernel %make_target %kernel_image debug
 %endif
 
-%if %{with_pae_debug}
-BuildKernel %make_target %kernel_image %{pae}debug
-%endif
-
-%if %{with_pae}
-BuildKernel %make_target %kernel_image %{pae}
-%endif
-
 %if %{with_up}
 BuildKernel %make_target %kernel_image
 %endif
@@ -1725,14 +1370,8 @@ popd
 
 %define __modsign_install_post \
   if [ "%{signmodules}" -eq "1" ]; then \
-    if [ "%{with_pae}" -ne "0" ]; then \
-      %{modsign_cmd} certs/signing_key.pem.sign+%{pae} certs/signing_key.x509.sign+%{pae} $RPM_BUILD_ROOT/lib/modules/%{KVERREL}+%{pae}/ \
-    fi \
     if [ "%{with_debug}" -ne "0" ]; then \
       %{modsign_cmd} certs/signing_key.pem.sign+debug certs/signing_key.x509.sign+debug $RPM_BUILD_ROOT/lib/modules/%{KVERREL}+debug/ \
-    fi \
-    if [ "%{with_pae_debug}" -ne "0" ]; then \
-      %{modsign_cmd} certs/signing_key.pem.sign+%{pae}debug certs/signing_key.x509.sign+%{pae}debug $RPM_BUILD_ROOT/lib/modules/%{KVERREL}+%{pae}debug/ \
     fi \
     if [ "%{with_up}" -ne "0" ]; then \
       %{modsign_cmd} certs/signing_key.pem.sign certs/signing_key.x509.sign $RPM_BUILD_ROOT/lib/modules/%{KVERREL}/ \
@@ -1795,51 +1434,6 @@ find $RPM_BUILD_ROOT/usr/include \
      \( -name .install -o -name .check -o \
      	-name ..install.cmd -o -name ..check.cmd \) | xargs rm -f
 
-%endif
-
-%if %{with_cross_headers}
-mkdir -p $RPM_BUILD_ROOT/usr/tmp-headers
-make ARCH=%{hdrarch} INSTALL_HDR_PATH=$RPM_BUILD_ROOT/usr/tmp-headers headers_install_all
-
-find $RPM_BUILD_ROOT/usr/tmp-headers/include \
-     \( -name .install -o -name .check -o \
-     	-name ..install.cmd -o -name ..check.cmd \) | xargs rm -f
-
-# Copy all the architectures we care about to their respective asm directories
-for arch in arm arm64 powerpc s390 x86 ; do
-mkdir -p $RPM_BUILD_ROOT/usr/${arch}-linux-gnu/include
-mv $RPM_BUILD_ROOT/usr/tmp-headers/include/asm-${arch} $RPM_BUILD_ROOT/usr/${arch}-linux-gnu/include/asm
-cp -a $RPM_BUILD_ROOT/usr/tmp-headers/include/asm-generic $RPM_BUILD_ROOT/usr/${arch}-linux-gnu/include/.
-done
-
-# Remove the rest of the architectures
-rm -rf $RPM_BUILD_ROOT/usr/tmp-headers/include/arch*
-rm -rf $RPM_BUILD_ROOT/usr/tmp-headers/include/asm-*
-
-# Copy the rest of the headers over
-for arch in arm arm64 powerpc s390 x86 ; do
-cp -a $RPM_BUILD_ROOT/usr/tmp-headers/include/* $RPM_BUILD_ROOT/usr/${arch}-linux-gnu/include/.
-done
-
-rm -rf $RPM_BUILD_ROOT/usr/tmp-headers
-%endif
-
-%if %{with_perf}
-# perf tool binary and supporting scripts/binaries
-%{perf_make} DESTDIR=$RPM_BUILD_ROOT lib=%{_lib} install-bin install-traceevent-plugins
-# remove the 'trace' symlink.
-rm -f %{buildroot}%{_bindir}/trace
-# remove the perf-tips
-rm -rf %{buildroot}%{_docdir}/perf-tip
-
-# python-perf extension
-%{perf_make} DESTDIR=$RPM_BUILD_ROOT install-python_ext
-
-# perf man pages (note: implicit rpm magic compresses them later)
-mkdir -p %{buildroot}/%{_mandir}/man1
-pushd %{buildroot}/%{_mandir}/man1
-tar -xf %{SOURCE10}
-popd
 %endif
 
 %if %{with_tools}
@@ -2154,5 +1748,3 @@ fi
 
 %kernel_variant_files %{with_up}
 %kernel_variant_files %{with_debug} debug
-%kernel_variant_files %{with_pae} %{pae}
-%kernel_variant_files %{with_pae_debug} %{pae}debug
