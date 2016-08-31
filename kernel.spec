@@ -32,7 +32,6 @@ Summary: The Linux kernel
 # Overrides for generic default options
 
 # Per-arch tweaks
-%define asmarch x86
 %define all_arch_configs kernel-%{version}-x86_64*.config
 %define kernel_image arch/x86/boot/bzImage
 
