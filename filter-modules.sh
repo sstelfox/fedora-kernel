@@ -36,9 +36,6 @@ drmdrvs="amd ast gma500 i2c i915 mgag200 nouveau radeon via "
 
 singlemods="ntb_netdev iscsi_ibft iscsi_boot_sysfs megaraid pmcraid qla1280 9pnet_rdma rpcrdma nvmet-rdma nvme-rdma hid-picolcd hid-prodikeys hwa-hc hwpoison-inject hid-sensor-hub target_core_user sbp_target cxgbit iw_cxgb3 iw_cxgb4 cxgb3i cxgb3i cxgb3i_ddp cxgb4i"
 
-# Grab the arch-specific filter list overrides
-source ./filter-$2.sh
-
 filter_dir() {
 	filelist=$1
 	dir=$2
