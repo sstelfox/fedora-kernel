@@ -1,15 +1,6 @@
-# Makefile for source rpm: kernel
-SPECFILE := kernel.spec
-
-# we only check the .sign signatures
-UPSTREAM_CHECKS = sign
-
 CFG		= kernel-$(VERSION)
-
 CONFIGFILES	= $(CFG)-x86_64.config $(CFG)-x86_64-debug.config
-
-PLATFORMS	= x86 x86_64
-TEMPFILES	= $(addprefix temp-, $(addsuffix -generic, $(PLATFORMS)))
+TEMPFILES	= $(addprefix temp-, $(addsuffix -generic, x86_64))
 
 configs: $(CONFIGFILES)
 	@rm -f kernel-*-config
@@ -38,18 +29,11 @@ temp-x86_64-generic: temp-x86-64 temp-generic
 temp-x86_64-debug-generic: temp-x86-64 temp-debug-generic
 	perl merge.pl $^  > $@
 
-$(CFG)-x86_64.config: /dev/null temp-x86_64-generic
+$(CFG)-x86_64.config: temp-x86_64-generic
 	perl merge.pl $^ x86_64 > $@
 
-$(CFG)-x86_64-debug.config: /dev/null temp-x86_64-debug-generic
+$(CFG)-x86_64-debug.config: temp-x86_64-debug-generic
 	perl merge.pl $^ x86_64 > $@
 
-prep:
-	fedpkg -v prep
-
-noarch:
-	fedpkg -v local --arch=noarch
-
-# 'make local' also needs to build the noarch firmware package
 local:
 	fedpkg -v local

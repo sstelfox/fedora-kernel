@@ -7,20 +7,14 @@ Summary: The Linux kernel
 # Must be > 0, increment upon build using `rpmdev-bumpspec -c 'comment for
 # changelog'`. When changing base_sublevel reset this to 1.
 %global baserelease 201
-%global fedora_build %{baserelease}
 
 # base_sublevel is the kernel version we're starting with and patching. Kernel
 # 3.1-rc7-git1 starts with a 3.0 base, so base_sublevel would be 0.
 %define base_sublevel 7
 
-# Do we have a -stable update to apply?
-%define stable_update 2
-%define stablerev %{stable_update}
-%define stable_base %{stable_update}
+%define rpmversion 4.%{base_sublevel}.2
 
-%define rpmversion 4.%{base_sublevel}.%{stable_update}
-
-%define pkg_release %{fedora_build}%{?buildid}%{?dist}
+%define pkg_release %{baserelease}%{?buildid}%{?dist}
 
 # The kernel tarball/base version
 %define kversion 4.%{base_sublevel}
@@ -47,8 +41,8 @@ Summary: The Linux kernel
 
 # Packages that need to be installed before the kernel is, because the %%post
 # scripts use them.
-%define kernel_prereq  coreutils, systemd >= 203-2, /usr/bin/kernel-install
-%define initrd_prereq  dracut >= 027
+%define kernel_prereq coreutils, systemd >= 203-2, /usr/bin/kernel-install
+%define initrd_prereq dracut >= 027
 
 Name: kernel%{?variant}
 Group: System Environment/Kernel
@@ -59,9 +53,7 @@ Release: %{pkg_release}
 ExclusiveArch: x86_64
 ExclusiveOS: Linux
 
-#
 # List the packages used during the kernel build
-#
 BuildRequires: kmod, patch, bash, sh-utils, tar, git
 BuildRequires: bzip2, xz, findutils, gzip, m4, perl, perl-Carp, perl-devel, make, diffutils, gawk
 BuildRequires: gcc, binutils, redhat-rpm-config, hmaccalc
@@ -92,16 +84,10 @@ Source24: config-no-extra
 Source30: config-x86-generic
 Source40: config-x86_64-generic
 
-# This file is intentionally left empty in the stock kernel. Its a nicety
-# added for those wanting to do custom rebuilds with altered config opts.
-Source1000: config-local
-
 # Sources for kernel-tools
 Source2000: cpupower.service
 Source2001: cpupower.config
 
-# For a stable release kernel
-Source5000: patch-4.%{base_sublevel}.%{stable_base}.xz
 Source5005: kbuild-AFTER_LINK.patch
 
 BuildRoot: %{_tmppath}/kernel-%{KVERREL}-root
@@ -148,30 +134,10 @@ Obsoletes: kernel-headers < %{rpmversion}-%{pkg_release}
 Provides: kernel-headers = %{rpmversion}-%{pkg_release}
 %endif
 %description headers
-Kernel-headers includes the C header files that specify the interface
-between the Linux kernel and userspace libraries and programs.  The
-header files define structures and constants that are needed for
-building most standard programs and are also needed for rebuilding the
-glibc package.
-
-%package cross-headers
-Summary: Header files for the Linux kernel for use by cross-glibc
-Group: Development/System
-%description cross-headers
-Kernel-cross-headers includes the C header files that specify the interface
-between the Linux kernel and userspace libraries and programs.  The
-header files define structures and constants that are needed for
-building most standard programs and are also needed for rebuilding the
-cross-glibc package.
-
-
-%package bootwrapper
-Summary: Boot wrapper files for generating combined kernel + initrd images
-Group: Development/System
-Requires: gzip binutils
-%description bootwrapper
-Kernel-bootwrapper contains the wrapper code which makes bootable "zImage"
-files combining both kernel and initial ramdisk.
+Kernel-headers includes the C header files that specify the interface between
+the Linux kernel and userspace libraries and programs. The header files define
+structures and constants that are needed for building most standard programs
+and are also needed for rebuilding the glibc package.
 
 %package -n kernel-tools
 Summary: Assortment of tools for the Linux kernel
@@ -186,16 +152,16 @@ Obsoletes: cpufrequtils < 1:009-0.6.p1
 Obsoletes: cpuspeed < 1:1.5-16
 Requires: kernel-tools-libs = %{version}-%{release}
 %description -n kernel-tools
-This package contains the tools/ directory from the kernel source
-and the supporting documentation.
+This package contains the tools/ directory from the kernel source and the
+supporting documentation.
 
 %package -n kernel-tools-libs
 Summary: Libraries for the kernels-tools
 Group: Development/System
 License: GPLv2
 %description -n kernel-tools-libs
-This package contains the libraries built from the tools/ directory
-from the kernel source.
+This package contains the libraries built from the tools/ directory from the
+kernel source.
 
 %package -n kernel-tools-libs-devel
 Summary: Assortment of tools for the Linux kernel
@@ -207,8 +173,8 @@ Obsoletes: cpupowerutils-devel < 1:009-0.6.p1
 Requires: kernel-tools-libs = %{version}-%{release}
 Provides: kernel-tools-devel
 %description -n kernel-tools-libs-devel
-This package contains the development files for the tools/ directory from
-the kernel source.
+This package contains the development files for the tools/ directory from the
+kernel source.
 
 # This macro creates a kernel-<subpackage>-devel package.
 #   %%kernel_devel_package <subpackage> <pretty-name>
@@ -249,10 +215,8 @@ AutoProv: yes\
 This package provides less commonly used kernel modules for the %{?2:%{2} }kernel package.\
 %{nil}
 
-#
 # This macro creates a kernel-<subpackage>-modules package.
-#	%%kernel_modules_package <subpackage> <pretty-name>
-#
+#   %%kernel_modules_package <subpackage> <pretty-name>
 %define kernel_modules_package() \
 %package %{?1:%{1}-}modules\
 Summary: kernel modules to match the %{?2:%{2}-}core kernel\
@@ -269,10 +233,8 @@ AutoProv: yes\
 This package provides commonly used kernel modules for the %{?2:%{2}-}core kernel package.\
 %{nil}
 
-#
-# this macro creates a kernel-<subpackage> meta package.
-#	%%kernel_meta_package <subpackage>
-#
+# This macro creates a kernel-<subpackage> meta package.
+#   %%kernel_meta_package <subpackage>
 %define kernel_meta_package() \
 %package %{1}\
 summary: kernel meta-package for the %{1} kernel\
@@ -284,11 +246,9 @@ Provides: installonlypkg(kernel)\
 The meta-package for the %{1} kernel\
 %{nil}
 
-#
 # This macro creates a kernel-<subpackage> and its -devel too.
 #   %%define variant_summary The Linux kernel compiled for <configuration>
 #   %%kernel_variant_package [-n <pretty-name>] <subpackage>
-#
 %define kernel_variant_package(n:) \
 %package %{?1:%{1}-}core\
 Summary: %{variant_summary}\
@@ -304,17 +264,14 @@ Provides: installonlypkg(kernel)\
 %{expand:%%kernel_modules_extra_package %{?1:%{1}} %{!?{-n}:%{1}}%{?{-n}:%{-n*}}}\
 %{nil}
 
-# Now, each variant package.
-
-# And finally the main -core package
+# The main -core package
 
 %define variant_summary The Linux kernel
-%kernel_variant_package 
+%kernel_variant_package
 %description core
-The kernel package contains the Linux kernel (vmlinuz), the core of any
-Linux operating system.  The kernel handles the basic functions
-of the operating system: memory allocation, process allocation, device
-input and output, etc.
+The kernel package contains the Linux kernel (vmlinuz), the core of any Linux
+operating system. The kernel handles the basic functions of the operating
+system: memory allocation, process allocation, device input and output, etc.
 
 %prep
 
@@ -323,9 +280,8 @@ echo "baserelease must be greater than zero"
 exit 1
 %endif
 
-# First we unpack the kernel tarball.
-# If this isn't the first make prep, we use links to the existing clean tarball
-# which speeds things up quite a bit.
+# First we unpack the kernel tarball. If this isn't the first make prep, we use
+# links to the existing clean tarball which speeds things up quite a bit.
 
 # Update to latest upstream.
 %define vanillaversion 4.%{base_sublevel}
@@ -339,13 +295,12 @@ exit 1
 # Build a list of the other top-level kernel tree directories.
 # This will be used to hardlink identical vanilla subdirs.
 sharedirs=$(find "$PWD" -maxdepth 1 -type d -name 'kernel-4.*' \
-            | grep -x -v "$PWD"/kernel-%{kversion}%{?dist}) ||:
+              | grep -x -v "$PWD"/kernel-%{kversion}%{?dist}) ||:
 
 # Delete all old stale trees.
 if [ -d kernel-%{kversion}%{?dist} ]; then
   cd kernel-%{kversion}%{?dist}
-  for i in linux-*
-  do
+  for i in linux-*; do
      if [ -d $i ]; then
        # Just in case we ctrl-c'd a prep already
        rm -rf deleteme.%{_target_cpu}
@@ -359,9 +314,7 @@ fi
 
 # Generate new tree
 if [ ! -d kernel-%{kversion}%{?dist}/vanilla-%{vanillaversion} ]; then
-
   if [ -d kernel-%{kversion}%{?dist}/vanilla-%{kversion} ]; then
-
     # The base vanilla version already exists.
     cd kernel-%{kversion}%{?dist}
 
@@ -369,16 +322,16 @@ if [ ! -d kernel-%{kversion}%{?dist}/vanilla-%{vanillaversion} ]; then
     for dir in vanilla-*; do
       [ "$dir" = vanilla-%{kversion} ] || rm -rf $dir &
     done
-
   else
-
     rm -f pax_global_header
+
     # Look for an identical base vanilla dir that can be hardlinked.
     for sharedir in $sharedirs ; do
       if [[ ! -z $sharedir  &&  -d $sharedir/vanilla-%{kversion} ]] ; then
         break
       fi
     done
+
     if [[ ! -z $sharedir  &&  -d $sharedir/vanilla-%{kversion} ]] ; then
 %setup -q -n kernel-%{kversion}%{?dist} -c -T
       cp -al $sharedir/vanilla-%{kversion} .
@@ -386,79 +339,24 @@ if [ ! -d kernel-%{kversion}%{?dist}/vanilla-%{vanillaversion} ]; then
 %setup -q -n kernel-%{kversion}%{?dist} -c
       mv linux-%{kversion} vanilla-%{kversion}
     fi
-
   fi
-
-%if "%{kversion}" != "%{vanillaversion}"
-
-  for sharedir in $sharedirs ; do
-    if [[ ! -z $sharedir  &&  -d $sharedir/vanilla-%{vanillaversion} ]] ; then
-      break
-    fi
-  done
-  if [[ ! -z $sharedir  &&  -d $sharedir/vanilla-%{vanillaversion} ]] ; then
-
-    cp -al $sharedir/vanilla-%{vanillaversion} .
-
-  else
-
-    # Need to apply patches to the base vanilla version.
-    cp -al vanilla-%{kversion} vanilla-%{vanillaversion}
-    cd vanilla-%{vanillaversion}
-
-# Update vanilla to the latest upstream.
-# (non-released_kernel case only)
-%if 0%{?rcrev}
-    xzcat %{SOURCE5000} | patch -p1 -F1 -s
-%if 0%{?gitrev}
-    xzcat %{SOURCE5001} | patch -p1 -F1 -s
-%endif
-%else
-# pre-{base_sublevel+1}-rc1 case
-%if 0%{?gitrev}
-    xzcat %{SOURCE5000} | patch -p1 -F1 -s
-%endif
-%endif
-    git init
-    git config user.email "kernel-team@fedoraproject.org"
-    git config user.name "Fedora Kernel Team"
-    git config gc.auto 0
-    git add .
-    git commit -a -q -m "baseline"
-
-    cd ..
-
-  fi
-
-%endif
-
 else
-
-  # We already have all vanilla dirs, just change to the top-level directory.
   cd kernel-%{kversion}%{?dist}
-
 fi
 
 # Now build the fedora kernel tree.
 cp -al vanilla-%{vanillaversion} linux-%{KVERREL}
 
 cd linux-%{KVERREL}
+
 if [ ! -d .git ]; then
-    git init
-    git config user.email "kernel-team@fedoraproject.org"
-    git config user.name "Fedora Kernel Team"
-    git config gc.auto 0
-    git add .
-    git commit -a -q -m "baseline"
+  git init
+  git config user.email "kernel-team@fedoraproject.org"
+  git config user.name "Fedora Kernel Team"
+  git config gc.auto 0
+  git add .
+  git commit -a -q -m "baseline"
 fi
-
-
-# released_kernel with possible stable updates
-%if 0%{?stable_base}
-# This is special because the kernel spec is hell and nothing is consistent
-xzcat %{SOURCE5000} | patch -p1 -F1 -s
-git commit -a -m "Stable update"
-%endif
 
 # Drop some necessary files from the source dir into the buildroot
 cp $RPM_SOURCE_DIR/config-* .
@@ -467,33 +365,22 @@ cp %{SOURCE15} .
 # Dynamically generate kernel .config files from config-* files
 make -f %{SOURCE20} VERSION=%{version} configs
 
-# Merge in any user-provided local config option changes
-for i in %{all_arch_configs}; do
-  mv $i $i.tmp
-  ./merge.pl %{SOURCE1000} $i.tmp > $i
-  rm $i.tmp
-done
-
 # The kbuild-AFTER_LINK patch is needed regardless so we list it as a Source
 # file and apply it separately from the rest.
 git am %{SOURCE5005}
-
 git am %{patches}
 
 # Any further pre-build tree manipulations happen here.
-
 chmod +x scripts/checkpatch.pl
 
 # This Prevents scripts/setlocalversion from mucking with our version numbers.
 touch .scmversion
 
 mkdir configs
-
 rm -f kernel-%{version}-*debug.config
 
 # now run oldconfig over all the config files
-for i in *.config
-do
+for i in *.config; do
   mv $i .config
   Arch=`head -1 .config | cut -b 3-`
   make ARCH=$Arch listnewconfig | grep -E '^CONFIG_' >.newoptions || true
@@ -518,13 +405,9 @@ find . -name .gitignore -exec rm -f {} \; >/dev/null
 
 cd ..
 
-###
-### build
-###
 %build
 
-cp_vmlinux()
-{
+cp_vmlinux() {
   eu-strip --remove-comment -o "$2" "$1"
 }
 
@@ -550,20 +433,11 @@ BuildKernel() {
     KernelVer=%{version}-%{release}.%{_target_cpu}${Flav}
     echo BUILDING A KERNEL FOR ${Flavour} %{_target_cpu}...
 
-    %if 0%{?stable_update}
     # make sure SUBLEVEL is incremented on a stable release.  Sigh 3.x.
-    perl -p -i -e "s/^SUBLEVEL.*/SUBLEVEL = %{?stablerev}/" Makefile
-    %endif
+    perl -p -i -e "s/^SUBLEVEL.*/SUBLEVEL = 2/" Makefile
 
     # make sure EXTRAVERSION says what we want it to say
     perl -p -i -e "s/^EXTRAVERSION.*/EXTRAVERSION = -%{release}.%{_target_cpu}${Flav}/" Makefile
-
-    # if pre-rc1 devel kernel, must fix up PATCHLEVEL for our versioning scheme
-    %if !0%{?rcrev}
-    %if 0%{?gitrev}
-    perl -p -i -e 's/^PATCHLEVEL.*/PATCHLEVEL = %{upstream_sublevel}/' Makefile
-    %endif
-    %endif
 
     # and now to start the build process
 
@@ -582,12 +456,6 @@ BuildKernel() {
     mkdir -p $RPM_BUILD_ROOT/%{image_install_path}
     mkdir -p $RPM_BUILD_ROOT/lib/modules/$KernelVer
 
-%ifarch %{arm} aarch64
-    %{make} -s ARCH=$Arch V=1 dtbs dtbs_install INSTALL_DTBS_PATH=$RPM_BUILD_ROOT/%{image_install_path}/dtb-$KernelVer
-    cp -r $RPM_BUILD_ROOT/%{image_install_path}/dtb-$KernelVer $RPM_BUILD_ROOT/lib/modules/$KernelVer/dtb
-    find arch/$Arch/boot/dts -name '*.dtb' -type f | xargs rm -f
-%endif
-
     # Start installing the results
     install -m 644 .config $RPM_BUILD_ROOT/boot/config-$KernelVer
     install -m 644 .config $RPM_BUILD_ROOT/lib/modules/$KernelVer/config
@@ -595,7 +463,8 @@ BuildKernel() {
     install -m 644 System.map $RPM_BUILD_ROOT/lib/modules/$KernelVer/System.map
 
     # We estimate the size of the initramfs because rpm needs to take this size
-    # into consideration when performing disk space calculations. (See bz #530778)
+    # into consideration when performing disk space calculations. (See bz
+    # #530778)
     dd if=/dev/zero of=$RPM_BUILD_ROOT/boot/initramfs-$KernelVer.img bs=1M count=20
 
     if [ -f arch/$Arch/boot/zImage.stub ]; then
@@ -606,13 +475,13 @@ BuildKernel() {
     # Sign the image if we're using EFI
     %pesign -s -i $KernelImage -o vmlinuz.signed
     if [ ! -s vmlinuz.signed ]; then
-        echo "pesigning failed"
-        exit 1
+      echo "pesigning failed"
+      exit 1
     fi
     mv vmlinuz.signed $KernelImage
 
-    $CopyKernel $KernelImage \
-    		$RPM_BUILD_ROOT/%{image_install_path}/$InstallName-$KernelVer
+    $CopyKernel $KernelImage $RPM_BUILD_ROOT/%{image_install_path}/$InstallName-$KernelVer
+
     chmod 755 $RPM_BUILD_ROOT/%{image_install_path}/$InstallName-$KernelVer
     cp $RPM_BUILD_ROOT/%{image_install_path}/$InstallName-$KernelVer $RPM_BUILD_ROOT/lib/modules/$KernelVer/$InstallName
 
@@ -622,11 +491,11 @@ BuildKernel() {
     sha512hmac $RPM_BUILD_ROOT/%{image_install_path}/$InstallName-$KernelVer | sed -e "s,$RPM_BUILD_ROOT,," > $RPM_BUILD_ROOT/%{image_install_path}/.vmlinuz-$KernelVer.hmac;
     cp $RPM_BUILD_ROOT/%{image_install_path}/.vmlinuz-$KernelVer.hmac $RPM_BUILD_ROOT/lib/modules/$KernelVer/.vmlinuz.hmac
 
-    # Override $(mod-fw) because we don't want it to install any firmware
-    # we'll get it from the linux-firmware package and we don't want conflicts
+    # Override $(mod-fw) because we don't want it to install any firmware we'll
+    # get it from the linux-firmware package and we don't want conflicts
     %{make} -s ARCH=$Arch INSTALL_MOD_PATH=$RPM_BUILD_ROOT modules_install KERNELRELEASE=$KernelVer mod-fw=
-
     %{make} -s ARCH=$Arch INSTALL_MOD_PATH=$RPM_BUILD_ROOT vdso_install KERNELRELEASE=$KernelVer
+
     if [ ! -s ldconfig-kernel.conf ]; then
       echo > ldconfig-kernel.conf "\
 # Placeholder file, no vDSO hwcap entries used in this kernel."
@@ -645,59 +514,51 @@ BuildKernel() {
     rm -f $RPM_BUILD_ROOT/lib/modules/$KernelVer/build
     rm -f $RPM_BUILD_ROOT/lib/modules/$KernelVer/source
     mkdir -p $RPM_BUILD_ROOT/lib/modules/$KernelVer/build
+
     (cd $RPM_BUILD_ROOT/lib/modules/$KernelVer ; ln -s build source)
-    # dirs for additional modules per module-init-tools, kbuild/modules.txt
+
+    # Dirs for additional modules per module-init-tools, kbuild/modules.txt
     mkdir -p $RPM_BUILD_ROOT/lib/modules/$KernelVer/extra
     mkdir -p $RPM_BUILD_ROOT/lib/modules/$KernelVer/updates
-    # first copy everything
+
+    # First copy everything
     cp --parents `find  -type f -name "Makefile*" -o -name "Kconfig*"` $RPM_BUILD_ROOT/lib/modules/$KernelVer/build
     cp Module.symvers $RPM_BUILD_ROOT/lib/modules/$KernelVer/build
     cp System.map $RPM_BUILD_ROOT/lib/modules/$KernelVer/build
+
     if [ -s Module.markers ]; then
       cp Module.markers $RPM_BUILD_ROOT/lib/modules/$KernelVer/build
     fi
-    # then drop all but the needed Makefiles/Kconfig files
+
+    # Then drop all but the needed Makefiles/Kconfig files
     rm -rf $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/Documentation
     rm -rf $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/scripts
     rm -rf $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/include
     cp .config $RPM_BUILD_ROOT/lib/modules/$KernelVer/build
     cp -a scripts $RPM_BUILD_ROOT/lib/modules/$KernelVer/build
+
     if [ -f tools/objtool/objtool ]; then
       cp -a tools/objtool/objtool $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/tools/objtool/ || :
     fi
+
     if [ -d arch/$Arch/scripts ]; then
       cp -a arch/$Arch/scripts $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/arch/%{_arch} || :
     fi
+
     if [ -f arch/$Arch/*lds ]; then
       cp -a arch/$Arch/*lds $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/arch/%{_arch}/ || :
     fi
+
     rm -f $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/scripts/*.o
     rm -f $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/scripts/*/*.o
-%ifarch %{power64}
-    cp -a --parents arch/powerpc/lib/crtsavres.[So] $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/
-%endif
+
     if [ -d arch/%{asmarch}/include ]; then
       cp -a --parents arch/%{asmarch}/include $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/
     fi
-%ifarch aarch64
-    # arch/arm64/include/asm/xen references arch/arm
-    cp -a --parents arch/arm/include/asm/xen $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/
-    # arch/arm64/include/asm/opcodes.h references arch/arm
-    cp -a --parents arch/arm/include/asm/opcodes.h $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/
-%endif
-    # include the machine specific headers for ARM variants, if available.
-%ifarch %{arm}
-    if [ -d arch/%{asmarch}/mach-${Flavour}/include ]; then
-      cp -a --parents arch/%{asmarch}/mach-${Flavour}/include $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/
-    fi
-    # include a few files for 'make prepare'
-    cp -a --parents arch/arm/tools/gen-mach-types $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/
-    cp -a --parents arch/arm/tools/mach-types $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/
 
-%endif
     cp -a include $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/include
-%ifarch x86_64
-    # files for 'make prepare' to succeed with kernel-devel
+
+    # Files for 'make prepare' to succeed with kernel-devel
     cp -a --parents arch/x86/entry/syscalls/syscall_32.tbl $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/
     cp -a --parents arch/x86/entry/syscalls/syscalltbl.sh $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/
     cp -a --parents arch/x86/entry/syscalls/syscallhdr.sh $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/
@@ -718,7 +579,7 @@ BuildKernel() {
     cp -a --parents arch/x86/boot/string.h $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/
     cp -a --parents arch/x86/boot/string.c $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/
     cp -a --parents arch/x86/boot/ctype.h $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/
-%endif
+
     # Make sure the Makefile and version.h have a matching timestamp so that
     # external modules can be built
     touch -r $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/Makefile $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/include/generated/uapi/linux/version.h
@@ -732,27 +593,24 @@ BuildKernel() {
     xargs --no-run-if-empty chmod u+x < modnames
 
     # Generate a list of modules for block and networking.
-
     grep -F /drivers/ modnames | xargs --no-run-if-empty nm -upA |
     sed -n 's,^.*/\([^/]*\.ko\):  *U \(.*\)$,\1 \2,p' > drivers.undef
 
-    collect_modules_list()
-    {
+    collect_modules_list() {
       sed -r -n -e "s/^([^ ]+) \\.?($2)\$/\\1/p" drivers.undef |
         LC_ALL=C sort -u > $RPM_BUILD_ROOT/lib/modules/$KernelVer/modules.$1
+
       if [ ! -z "$3" ]; then
         sed -r -e "/^($3)\$/d" -i $RPM_BUILD_ROOT/lib/modules/$KernelVer/modules.$1
       fi
     }
 
     collect_modules_list networking \
-    			 'register_netdev|ieee80211_register_hw|usbnet_probe|phy_driver_register|rt(l_|2x00)(pci|usb)_probe|register_netdevice'
+           'register_netdev|ieee80211_register_hw|usbnet_probe|phy_driver_register|rt(l_|2x00)(pci|usb)_probe|register_netdevice'
     collect_modules_list block \
-    			 'ata_scsi_ioctl|scsi_add_host|scsi_add_host_with_dma|blk_alloc_queue|blk_init_queue|register_mtd_blktrans|scsi_esp_register|scsi_register_device_handler|blk_queue_physical_block_size' 'pktcdvd.ko|dm-mod.ko'
-    collect_modules_list drm \
-    			 'drm_open|drm_init'
-    collect_modules_list modesetting \
-    			 'drm_crtc_init'
+           'ata_scsi_ioctl|scsi_add_host|scsi_add_host_with_dma|blk_alloc_queue|blk_init_queue|register_mtd_blktrans|scsi_esp_register|scsi_register_device_handler|blk_queue_physical_block_size' 'pktcdvd.ko|dm-mod.ko'
+    collect_modules_list drm 'drm_open|drm_init'
+    collect_modules_list modesetting 'drm_crtc_init'
 
     # detect missing or incorrect license tags
     ( find $RPM_BUILD_ROOT/lib/modules/$KernelVer -name '*.ko' | xargs /sbin/modinfo -l | \
@@ -760,15 +618,13 @@ BuildKernel() {
 
     # remove files that will be auto generated by depmod at rpm -i time
     pushd $RPM_BUILD_ROOT/lib/modules/$KernelVer/
-        rm -f modules.{alias*,builtin.bin,dep*,*map,symbols*,devname,softdep}
+      rm -f modules.{alias*,builtin.bin,dep*,*map,symbols*,devname,softdep}
     popd
 
     # Call the modules-extra script to move things around
     %{SOURCE17} $RPM_BUILD_ROOT/lib/modules/$KernelVer %{SOURCE16}
 
-    #
     # Generate the kernel-core and kernel-modules files lists
-    #
 
     # Copy the System.map file for depmod to use, and create a backup of the
     # full module tree so we can restore it after we're done filtering
@@ -783,19 +639,21 @@ BuildKernel() {
     # Find all the module files and filter them out into the core and modules
     # lists.  This actually removes anything going into -modules from the dir.
     find lib/modules/$KernelVer/kernel -name *.ko | sort -n > modules.list
-	cp $RPM_SOURCE_DIR/filter-*.sh .
+
+    cp $RPM_SOURCE_DIR/filter-*.sh .
     %{SOURCE99} modules.list %{_target_cpu}
-	rm filter-*.sh
+    rm filter-*.sh
 
     # Run depmod on the resulting module tree and make sure it isn't broken
     depmod -b . -aeF ./System.map $KernelVer &> depmod.out
     if [ -s depmod.out ]; then
-        echo "Depmod failure"
-        cat depmod.out
-        exit 1
+      echo "Depmod failure"
+      cat depmod.out
+      exit 1
     else
-        rm depmod.out
+      rm depmod.out
     fi
+
     # remove files that will be auto generated by depmod at rpm -i time
     pushd $RPM_BUILD_ROOT/lib/modules/$KernelVer/
         rm -f modules.{alias*,builtin.bin,dep*,*map,symbols*,devname,softdep}
@@ -840,11 +698,7 @@ BuildKernel() {
     find $RPM_BUILD_ROOT/usr/src/kernels -name ".*.cmd" -exec rm -f {} \;
 }
 
-###
-# DO it...
-###
-
-# prepare directories
+# Prepare directories
 rm -rf $RPM_BUILD_ROOT
 mkdir -p $RPM_BUILD_ROOT/boot
 mkdir -p $RPM_BUILD_ROOT%{_libexecdir}
@@ -853,40 +707,38 @@ cd linux-%{KVERREL}
 
 BuildKernel %make_target %kernel_image
 
-%ifarch %{cpupowerarchs}
 # cpupower: make sure version-gen.sh is executable.
 chmod +x tools/power/cpupower/utils/version-gen.sh
 
 %{make} %{?_smp_mflags} -C tools/power/cpupower CPUFREQ_BENCH=false
 
-%ifarch x86_64
-    pushd tools/power/cpupower/debug/x86_64
-    %{make} %{?_smp_mflags} centrino-decode powernow-k8-decode
-    popd
-%endif # x86_64
+pushd tools/power/cpupower/debug/x86_64
+%{make} %{?_smp_mflags} centrino-decode powernow-k8-decode
+popd
 
-%ifarch x86_64
-   pushd tools/power/x86/x86_energy_perf_policy/
-   %{make}
-   popd
-   pushd tools/power/x86/turbostat
-   %{make}
-   popd
-%endif # x86_64
-%endif # %ifarch %{cpupowerarchs}
+pushd tools/power/x86/x86_energy_perf_policy/
+%{make}
+popd
+pushd tools/power/x86/turbostat
+%{make}
+popd
 
 pushd tools/thermal/tmon/
 %{make}
 popd
 
-# In the modsign case, we do 3 things.  1) We check the "flavour" and hard
-# code the value in the following invocations.  This is somewhat sub-optimal
-# but we're doing this inside of an RPM macro and it isn't as easy as it
-# could be because of that.  2) We restore the .tmp_versions/ directory from
-# the one we saved off in BuildKernel above.  This is to make sure we're
-# signing the modules we actually built/installed in that flavour.  3) We
-# grab the arch and invoke mod-sign.sh command to actually sign the modules.
-
+# In the modsign case, we do 3 things.
+#
+#   1) We check the "flavour" and hard code the value in the following
+#   invocations. This is somewhat sub-optimal but we're doing this inside of an
+#   RPM macro and it isn't as easy as it could be because of that.
+#
+#   2) We restore the .tmp_versions/ directory from the one we saved off in
+#   BuildKernel above. This is to make sure we're signing the modules we
+#   actually built/installed in that flavour.
+#
+#   3) We grab the arch and invoke mod-sign.sh command to actually sign the
+#   modules.
 %define __modsign_install_post \
   %{modsign_cmd} certs/signing_key.pem.sign certs/signing_key.x509.sign $RPM_BUILD_ROOT/lib/modules/%{KVERREL}/ \
   find $RPM_BUILD_ROOT/lib/modules/ -type f -name '*.ko' | xargs xz; \
@@ -910,36 +762,31 @@ make ARCH=%{hdrarch} INSTALL_HDR_PATH=$RPM_BUILD_ROOT/usr headers_install
 
 find $RPM_BUILD_ROOT/usr/include \
      \( -name .install -o -name .check -o \
-     	-name ..install.cmd -o -name ..check.cmd \) | xargs rm -f
+      -name ..install.cmd -o -name ..check.cmd \) | xargs rm -f
 
-%ifarch %{cpupowerarchs}
 %{make} -C tools/power/cpupower DESTDIR=$RPM_BUILD_ROOT libdir=%{_libdir} mandir=%{_mandir} CPUFREQ_BENCH=false install
 rm -f %{buildroot}%{_libdir}/*.{a,la}
 %find_lang cpupower
 mv cpupower.lang ../
 
-%ifarch x86_64
-    pushd tools/power/cpupower/debug/x86_64
-    install -m755 centrino-decode %{buildroot}%{_bindir}/centrino-decode
-    install -m755 powernow-k8-decode %{buildroot}%{_bindir}/powernow-k8-decode
-    popd
-%endif
+pushd tools/power/cpupower/debug/x86_64
+install -m755 centrino-decode %{buildroot}%{_bindir}/centrino-decode
+install -m755 powernow-k8-decode %{buildroot}%{_bindir}/powernow-k8-decode
+popd
 
 chmod 0755 %{buildroot}%{_libdir}/libcpupower.so*
 mkdir -p %{buildroot}%{_unitdir} %{buildroot}%{_sysconfdir}/sysconfig
 install -m644 %{SOURCE2000} %{buildroot}%{_unitdir}/cpupower.service
 install -m644 %{SOURCE2001} %{buildroot}%{_sysconfdir}/sysconfig/cpupower
-%endif
 
-%ifarch x86_64
-   mkdir -p %{buildroot}%{_mandir}/man8
-   pushd tools/power/x86/x86_energy_perf_policy
-   make DESTDIR=%{buildroot} install
-   popd
-   pushd tools/power/x86/turbostat
-   make DESTDIR=%{buildroot} install
-   popd
-%endif #turbostat/x86_energy_perf_policy
+mkdir -p %{buildroot}%{_mandir}/man8
+pushd tools/power/x86/x86_energy_perf_policy
+make DESTDIR=%{buildroot} install
+popd
+
+pushd tools/power/x86/turbostat
+make DESTDIR=%{buildroot} install
+popd
 
 pushd tools/thermal/tmon
 make INSTALL_ROOT=%{buildroot} install
@@ -959,24 +806,20 @@ rm -rf $RPM_BUILD_ROOT
 #   %%kernel_devel_post [<subpackage>]
 %define kernel_devel_post() \
 %{expand:%%post %{?1:%{1}-}devel}\
-if [ -f /etc/sysconfig/kernel ]\
-then\
-    . /etc/sysconfig/kernel || exit $?\
+if [ -f /etc/sysconfig/kernel ]; then\
+  . /etc/sysconfig/kernel || exit $?\
 fi\
-if [ "$HARDLINK" != "no" -a -x /usr/sbin/hardlink ]\
-then\
-    (cd /usr/src/kernels/%{KVERREL}%{?1:+%{1}} &&\
-     /usr/bin/find . -type f | while read f; do\
-       hardlink -c /usr/src/kernels/*.fc*.*/$f $f\
-     done)\
+if [ "$HARDLINK" != "no" -a -x /usr/sbin/hardlink ]; then\
+  (cd /usr/src/kernels/%{KVERREL}%{?1:+%{1}} &&\
+    /usr/bin/find . -type f | while read f; do\
+      hardlink -c /usr/src/kernels/*.fc*.*/$f $f\
+    done)\
 fi\
 %{nil}
 
-#
 # This macro defines a %%post script for a kernel*-modules-extra package.
 # It also defines a %%postun script that does the same thing.
-#	%%kernel_modules_extra_post [<subpackage>]
-#
+#   %%kernel_modules_extra_post [<subpackage>]
 %define kernel_modules_extra_post() \
 %{expand:%%post %{?1:%{1}-}modules-extra}\
 /sbin/depmod -a %{KVERREL}%{?1:+%{1}}\
@@ -985,11 +828,9 @@ fi\
 /sbin/depmod -a %{KVERREL}%{?1:+%{1}}\
 %{nil}
 
-#
 # This macro defines a %%post script for a kernel*-modules package.
 # It also defines a %%postun script that does the same thing.
-#	%%kernel_modules_post [<subpackage>]
-#
+#   %%kernel_modules_post [<subpackage>]
 %define kernel_modules_post() \
 %{expand:%%post %{?1:%{1}-}modules}\
 /sbin/depmod -a %{KVERREL}%{?1:+%{1}}\
@@ -998,20 +839,17 @@ fi\
 /sbin/depmod -a %{KVERREL}%{?1:+%{1}}\
 %{nil}
 
-# This macro defines a %%posttrans script for a kernel package.
-#	%%kernel_variant_posttrans [<subpackage>]
-# More text can follow to go at the end of this variant's %%post.
-#
+# This macro defines a %%posttrans script for a kernel package. More text can
+# follow to go at the end of this variant's %%post.
+#   %%kernel_variant_posttrans [<subpackage>]
 %define kernel_variant_posttrans() \
 %{expand:%%posttrans %{?1:%{1}-}core}\
 /bin/kernel-install add %{KVERREL}%{?1:+%{1}} /lib/modules/%{KVERREL}%{?1:+%{1}}/vmlinuz || exit $?\
 %{nil}
 
-#
-# This macro defines a %%post script for a kernel package and its devel package.
-#	%%kernel_variant_post [-v <subpackage>] [-r <replace>]
-# More text can follow to go at the end of this variant's %%post.
-#
+# This macro defines a %%post script for a kernel package and its devel
+# package. More text can follow to go at the end of this variant's %%post.
+#   %%kernel_variant_post [-v <subpackage>] [-r <replace>]
 %define kernel_variant_post(v:r:) \
 %{expand:%%kernel_devel_post %{?-v*}}\
 %{expand:%%kernel_modules_post %{?-v*}}\
@@ -1019,16 +857,13 @@ fi\
 %{expand:%%kernel_variant_posttrans %{?-v*}}\
 %{expand:%%post %{?-v*:%{-v*}-}core}\
 %{-r:\
-if [ `uname -i` == "x86_64" -o `uname -i` == "i386" ] &&\
-   [ -f /etc/sysconfig/kernel ]; then\
+if [ -f /etc/sysconfig/kernel ]; then\
   /bin/sed -r -i -e 's/^DEFAULTKERNEL=%{-r*}$/DEFAULTKERNEL=kernel%{?-v:-%{-v*}}/' /etc/sysconfig/kernel || exit $?\
 fi}\
 %{nil}
 
-#
 # This macro defines a %%preun script for a kernel package.
-#	%%kernel_variant_preun <subpackage>
-#
+#   %%kernel_variant_preun <subpackage>
 %define kernel_variant_preun() \
 %{expand:%%preun %{?1:%{1}-}core}\
 /bin/kernel-install remove %{KVERREL}%{?1:+%{1}} /lib/modules/%{KVERREL}%{?1:+%{1}}/vmlinuz || exit $?\
@@ -1038,37 +873,28 @@ fi}\
 %kernel_variant_post -r kernel-smp
 
 if [ -x /sbin/ldconfig ]; then
-    /sbin/ldconfig -X || exit $?
+  /sbin/ldconfig -X || exit $?
 fi
 
-###
-### file lists
-###
-
+# file lists
 %files headers
 %defattr(-,root,root)
 /usr/include/*
 
 %files -n kernel-tools -f cpupower.lang
 %defattr(-,root,root)
-%ifarch %{cpupowerarchs}
 %{_bindir}/cpupower
-%ifarch x86_64
 %{_bindir}/centrino-decode
 %{_bindir}/powernow-k8-decode
-%endif
 %{_unitdir}/cpupower.service
 %{_mandir}/man[1-8]/cpupower*
 %config(noreplace) %{_sysconfdir}/sysconfig/cpupower
-%ifarch x86_64
 %{_bindir}/x86_energy_perf_policy
 %{_mandir}/man8/x86_energy_perf_policy*
 %{_bindir}/turbostat
 %{_mandir}/man8/turbostat*
-%endif
 %{_bindir}/tmon
 
-%ifarch %{cpupowerarchs}
 %files -n kernel-tools-libs
 %{_libdir}/libcpupower.so.0
 %{_libdir}/libcpupower.so.0.0.1
@@ -1076,21 +902,18 @@ fi
 %files -n kernel-tools-libs-devel
 %{_libdir}/libcpupower.so
 %{_includedir}/cpufreq.h
-%endif
 
 # empty meta-package
 %files
 %defattr(-,root,root)
 
-# This is %%{image_install_path} on an arch where that includes ELF files,
-# or empty otherwise.
+# This is %%{image_install_path} on an arch where that includes ELF files, or
+# empty otherwise.
 %define elf_image_install_path %{?kernel_image_elf:%{image_install_path}}
 
-#
 # This macro defines the %%files sections for a kernel package
 # and its devel and debuginfo packages.
-#	%%kernel_variant_files [-k vmlinux] <condition> <subpackage>
-#
+#   %%kernel_variant_files [-k vmlinux] <condition> <subpackage>
 %define kernel_variant_files(k:) \
 %if %{1}\
 %{expand:%%files -f kernel-%{?2:%{2}-}core.list %{?2:%{2}-}core}\
@@ -1101,10 +924,6 @@ fi
 %ghost /%{image_install_path}/%{?-k:%{-k*}}%{!?-k:vmlinuz}-%{KVERREL}%{?2:+%{2}}\
 /lib/modules/%{KVERREL}%{?2:+%{2}}/.vmlinuz.hmac \
 %ghost /%{image_install_path}/.vmlinuz-%{KVERREL}%{?2:+%{2}}.hmac \
-%ifarch %{arm} aarch64\
-/lib/modules/%{KVERREL}%{?2:+%{2}}/dtb \
-%ghost /%{image_install_path}/dtb-%{KVERREL}%{?2:+%{2}} \
-%endif\
 %attr(600,root,root) /lib/modules/%{KVERREL}%{?2:+%{2}}/System.map\
 %ghost /boot/System.map-%{KVERREL}%{?2:+%{2}}\
 /lib/modules/%{KVERREL}%{?2:+%{2}}/config\
