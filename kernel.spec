@@ -1,13 +1,5 @@
 %global __spec_install_pre %{___build_pre}
 
-%global released_kernel 1
-%global signkernel 1
-%global signmodules 1
-%global zipmodules 1
-
-%define with_headers 1
-%define with_perf 0
-
 Summary: The Linux kernel
 
 %global zipsed -e 's/\.ko$/\.ko.xz/'
@@ -28,40 +20,6 @@ Summary: The Linux kernel
 
 %define rpmversion 4.%{base_sublevel}.%{stable_update}
 
-# Nb: The above rcrev and gitrev values automagically define Patch00 and
-# Patch01 below.
-
-# What parts do we want to build?  We must build at least one kernel.
-# These are the kernels that are built IF the architecture allows it.
-# All should default to 1 (enabled) and be flipped to 0 (disabled)
-# by later arch-specific checks.
-
-# The following build options are enabled by default.
-# Use either --without <opt> in your rpmbuild command or force values
-# to 0 in here to disable them.
-#
-%define with_tools     %{?_without_tools:     0} %{?!_without_tools:     1}
-# standard kernel
-%define with_up        %{?_without_up:        0} %{?!_without_up:        1}
-# kernel-bootwrapper (for creating zImages from kernel + initrd)
-%define with_bootwrapper %{?_without_bootwrapper: 0} %{?!_without_bootwrapper: 1}
-# Want to build with the vsdo directories installed
-%define with_vdso_install %{?_without_vdso_install: 0} %{?!_without_vdso_install: 1}
-
-# Additional options for user-friendly one-off kernel building:
-#
-# Only build the base kernel (--with baseonly):
-%define with_baseonly  %{?_with_baseonly:     1} %{?!_with_baseonly:     0}
-#
-# should we do C=1 builds with sparse
-%define with_sparse    %{?_with_sparse:       1} %{?!_with_sparse:       0}
-%define with_cross 0
-
-%define debugbuildsenabled 0
-
-# Want to build a vanilla kernel build without any non-upstream patches?
-%define with_vanilla %{?_with_vanilla: 1} %{?!_with_vanilla: 0}
-
 %define pkg_release %{fedora_build}%{?buildid}%{?dist}
 
 # The kernel tarball/base version
@@ -74,53 +32,21 @@ Summary: The Linux kernel
 %define hdrarch %_target_cpu
 %define asmarch %_target_cpu
 
-%if 0%{!?nopatches:1}
-%define nopatches 0
-%endif
-
-%if %{with_vanilla}
-%define nopatches 1
-%endif
-
-%if %{nopatches}
-%define with_bootwrapper 0
-%define variant -vanilla
-%endif
-
 %define _enable_debug_packages 0
 %define debuginfodir /usr/lib/debug
 
 %define all_x86 i386 i686
 
-%if %{with_vdso_install}
 # These arches install vdso/ directories.
-%define vdso_arches %{all_x86} x86_64 %{power64} s390 s390x aarch64
-%endif
+%define vdso_arches %{all_x86} x86_64
 
 # Overrides for generic default options
-
-# don't build noarch kernels or headers (duh)
-%ifarch noarch
-%define with_up 0
-%define with_headers 0
-%define with_tools 0
-%define with_perf 0
-%define all_arch_configs kernel-%{version}-*.config
-%endif
-
-# bootwrapper is only on ppc
-# sparse blows up on ppc
-%ifnarch %{power64}
-%define with_bootwrapper 0
-%define with_sparse 0
-%endif
 
 # Per-arch tweaks
 
 %ifarch %{all_x86}
 %define asmarch x86
 %define hdrarch i386
-%define pae PAE
 %define all_arch_configs kernel-%{version}-i?86*.config
 %define kernel_image arch/x86/boot/bzImage
 %endif
@@ -131,32 +57,11 @@ Summary: The Linux kernel
 %define kernel_image arch/x86/boot/bzImage
 %endif
 
-# Should make listnewconfig fail if there's config options
-# printed out?
-%if %{nopatches}
-%define listnewconfig_fail 0
-%else
+# Should make listnewconfig fail if there's config options printed out?
 %define listnewconfig_fail 1
-%endif
-
-# To temporarily exclude an architecture from being built, add it to
-# %%nobuildarches. Do _NOT_ use the ExclusiveArch: line, because if we
-# don't build kernel-headers then the new build system will no longer let
-# us use the previous build of that package -- it'll just be completely AWOL.
-# Which is a BadThing(tm).
-
-# We only build kernel-headers on the following...
-%define nobuildarches i386 s390
-
-%ifarch %nobuildarches
-%define with_up 0
-%define with_perf 0
-%define with_tools 0
-%define _enable_debug_packages 0
-%endif
 
 # Architectures we build tools/cpupower on
-%define cpupowerarchs %{ix86} x86_64 %{power64} %{arm} aarch64 
+%define cpupowerarchs x86_64
 
 #
 # Packages that need to be installed before the kernel is, because the %%post
@@ -165,16 +70,13 @@ Summary: The Linux kernel
 %define kernel_prereq  coreutils, systemd >= 203-2, /usr/bin/kernel-install
 %define initrd_prereq  dracut >= 027
 
-
 Name: kernel%{?variant}
 Group: System Environment/Kernel
 License: GPLv2 and Redistributable, no modification permitted
 URL: http://www.kernel.org/
 Version: %{rpmversion}
 Release: %{pkg_release}
-# DO NOT CHANGE THE 'ExclusiveArch' LINE TO TEMPORARILY EXCLUDE AN ARCHITECTURE BUILD.
-# SET %%nobuildarches (ABOVE) INSTEAD
-ExclusiveArch: %{all_x86} x86_64 ppc64 ppc64p7 s390 s390x %{arm} aarch64 ppc64le
+ExclusiveArch: %{all_x86} x86_64
 ExclusiveOS: Linux
 
 #
@@ -184,31 +86,14 @@ BuildRequires: kmod, patch, bash, sh-utils, tar, git
 BuildRequires: bzip2, xz, findutils, gzip, m4, perl, perl-Carp, perl-devel, make, diffutils, gawk
 BuildRequires: gcc, binutils, redhat-rpm-config, hmaccalc
 BuildRequires: net-tools, hostname, bc
-%if %{with_sparse}
-BuildRequires: sparse
-%endif
-%if %{with_perf}
-BuildRequires: elfutils-devel zlib-devel binutils-devel newt-devel python-devel perl(ExtUtils::Embed) bison flex xz-devel
-BuildRequires: audit-libs-devel
-%ifnarch s390 s390x %{arm}
-BuildRequires: numactl-devel
-%endif
-%endif
-%if %{with_tools}
 BuildRequires: pciutils-devel gettext ncurses-devel
-%endif
 BuildConflicts: rhbuildsys(DiskFree) < 500Mb
 
-%if %{signkernel}%{signmodules}
 BuildRequires: openssl openssl-devel
-%if %{signkernel}
 BuildRequires: pesign >= 0.10-4
-%endif
-%endif
 
 Source0: ftp://ftp.kernel.org/pub/linux/kernel/v4.x/linux-%{kversion}.tar.xz
 
-Source10: perf-man-%{kversion}.tar.gz
 Source11: x509.genkey
 
 Source15: merge.pl
@@ -333,28 +218,6 @@ Requires: gzip binutils
 Kernel-bootwrapper contains the wrapper code which makes bootable "zImage"
 files combining both kernel and initial ramdisk.
 
-%if %{with_perf}
-%package -n perf
-Summary: Performance monitoring for the Linux kernel
-Group: Development/System
-License: GPLv2
-%description -n perf
-This package contains the perf tool, which enables performance monitoring
-of the Linux kernel.
-
-%package -n python-perf
-Summary: Python bindings for apps which will manipulate perf events
-Group: Development/Libraries
-%description -n python-perf
-The python-perf package contains a module that permits applications
-written in the Python programming language to use the interface
-to manipulate perf events.
-
-%{!?python_sitearch: %global python_sitearch %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib(1)")}
-
-%endif # with_perf
-
-%if %{with_tools}
 %package -n kernel-tools
 Summary: Assortment of tools for the Linux kernel
 Group: Development/System
@@ -391,8 +254,6 @@ Provides: kernel-tools-devel
 %description -n kernel-tools-libs-devel
 This package contains the development files for the tools/ directory from
 the kernel source.
-
-%endif # with_tools
 
 # This macro creates a kernel-<subpackage>-devel package.
 #   %%kernel_devel_package <subpackage> <pretty-name>
@@ -470,8 +331,8 @@ The meta-package for the %{1} kernel\
 
 #
 # This macro creates a kernel-<subpackage> and its -devel too.
-#	%%define variant_summary The Linux kernel compiled for <configuration>
-#	%%kernel_variant_package [-n <pretty-name>] <subpackage>
+#   %%define variant_summary The Linux kernel compiled for <configuration>
+#   %%kernel_variant_package [-n <pretty-name>] <subpackage>
 #
 %define kernel_variant_package(n:) \
 %package %{?1:%{1}-}core\
@@ -512,24 +373,7 @@ exit 1
 # which speeds things up quite a bit.
 
 # Update to latest upstream.
-%if 0%{?released_kernel}
 %define vanillaversion 4.%{base_sublevel}
-# non-released_kernel case
-%else
-%if 0%{?rcrev}
-%define vanillaversion 4.%{upstream_sublevel}-rc%{rcrev}
-%if 0%{?gitrev}
-%define vanillaversion 4.%{upstream_sublevel}-rc%{rcrev}-git%{gitrev}
-%endif
-%else
-# pre-{base_sublevel+1}-rc1 case
-%if 0%{?gitrev}
-%define vanillaversion 4.%{base_sublevel}-git%{gitrev}
-%else
-%define vanillaversion 4.%{base_sublevel}
-%endif
-%endif
-%endif
 
 # %%{vanillaversion} : the full version name, e.g. 2.6.35-rc6-git3
 # %%{kversion}       : the base version, e.g. 2.6.34
@@ -669,26 +513,17 @@ cp %{SOURCE15} .
 make -f %{SOURCE20} VERSION=%{version} configs
 
 # Merge in any user-provided local config option changes
-%ifnarch %nobuildarches
-for i in %{all_arch_configs}
-do
+for i in %{all_arch_configs}; do
   mv $i $i.tmp
   ./merge.pl %{SOURCE1000} $i.tmp > $i
   rm $i.tmp
 done
-%endif
 
 # The kbuild-AFTER_LINK patch is needed regardless so we list it as a Source
 # file and apply it separately from the rest.
 git am %{SOURCE5005}
 
-%if !%{nopatches}
-
 git am %{patches}
-
-# END OF PATCH APPLICATIONS
-
-%endif
 
 # Any further pre-build tree manipulations happen here.
 
@@ -697,14 +532,9 @@ chmod +x scripts/checkpatch.pl
 # This Prevents scripts/setlocalversion from mucking with our version numbers.
 touch .scmversion
 
-# only deal with configs if we are going to build for the arch
-%ifnarch %nobuildarches
-
 mkdir configs
 
 rm -f kernel-%{version}-*debug.config
-
-%define make make %{?cross_opts}
 
 # now run oldconfig over all the config files
 for i in *.config
@@ -724,7 +554,6 @@ do
   cat .config >> configs/$i
 done
 # end of kernel config
-%endif
 
 # get rid of unwanted files resulting from patch fuzz
 find . \( -name "*.orig" -o -name "*~" \) -exec rm -f {} \; >/dev/null
@@ -738,10 +567,6 @@ cd ..
 ### build
 ###
 %build
-
-%if %{with_sparse}
-%define sparse_mflags	C=1
-%endif
 
 cp_vmlinux()
 {
@@ -790,9 +615,7 @@ BuildKernel() {
     make -s mrproper
     cp configs/$Config .config
 
-    %if %{signkernel}%{signmodules}
     cp %{SOURCE11} certs/.
-    %endif
 
     Arch=`head -1 .config | cut -b 3-`
     echo USING ARCH=$Arch
@@ -824,7 +647,7 @@ BuildKernel() {
       cp arch/$Arch/boot/zImage.stub $RPM_BUILD_ROOT/%{image_install_path}/zImage.stub-$KernelVer || :
       cp arch/$Arch/boot/zImage.stub $RPM_BUILD_ROOT/lib/modules/$KernelVer/zImage.stub-$KernelVer || :
     fi
-    %if %{signkernel}
+
     # Sign the image if we're using EFI
     %pesign -s -i $KernelImage -o vmlinuz.signed
     if [ ! -s vmlinuz.signed ]; then
@@ -832,7 +655,7 @@ BuildKernel() {
         exit 1
     fi
     mv vmlinuz.signed $KernelImage
-    %endif
+
     $CopyKernel $KernelImage \
     		$RPM_BUILD_ROOT/%{image_install_path}/$InstallName-$KernelVer
     chmod 755 $RPM_BUILD_ROOT/%{image_install_path}/$InstallName-$KernelVer
@@ -920,7 +743,7 @@ BuildKernel() {
 
 %endif
     cp -a include $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/include
-%ifarch %{ix86} x86_64
+%ifarch x86_64
     # files for 'make prepare' to succeed with kernel-devel
     cp -a --parents arch/x86/entry/syscalls/syscall_32.tbl $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/
     cp -a --parents arch/x86/entry/syscalls/syscalltbl.sh $RPM_BUILD_ROOT/lib/modules/$KernelVer/build/
@@ -1046,11 +869,9 @@ BuildKernel() {
     rm -f $RPM_BUILD_ROOT/modules.list
     rm -f $RPM_BUILD_ROOT/module-dirs.list
 
-%if %{signmodules}
     # Save the signing keys so we can sign the modules in __modsign_install_post
     cp certs/signing_key.pem certs/signing_key.pem.sign${Flav}
     cp certs/signing_key.x509 certs/signing_key.x509.sign${Flav}
-%endif
 
     # Move the devel headers out of the root file system
     mkdir -p $RPM_BUILD_ROOT/usr/src/kernels
@@ -1077,41 +898,33 @@ mkdir -p $RPM_BUILD_ROOT%{_libexecdir}
 
 cd linux-%{KVERREL}
 
-%if %{with_up}
 BuildKernel %make_target %kernel_image
-%endif
 
-%global perf_make \
-  make -s EXTRA_CFLAGS="${RPM_OPT_FLAGS}" LDFLAGS="%{__global_ldflags}" %{?cross_opts} %{?_smp_mflags} -C tools/perf V=1 NO_PERF_READ_VDSO32=1 NO_PERF_READ_VDSOX32=1 WERROR=0 NO_LIBUNWIND=1 HAVE_CPLUS_DEMANGLE=1 NO_GTK2=1 NO_STRLCPY=1 NO_BIONIC=1 prefix=%{_prefix}
-%if %{with_perf}
-# perf
-%{perf_make} DESTDIR=$RPM_BUILD_ROOT all
-%endif
-
-%if %{with_tools}
 %ifarch %{cpupowerarchs}
-# cpupower
-# make sure version-gen.sh is executable.
+# cpupower: make sure version-gen.sh is executable.
 chmod +x tools/power/cpupower/utils/version-gen.sh
+
 %{make} %{?_smp_mflags} -C tools/power/cpupower CPUFREQ_BENCH=false
+
 %ifarch x86_64
     pushd tools/power/cpupower/debug/x86_64
     %{make} %{?_smp_mflags} centrino-decode powernow-k8-decode
     popd
-%endif
-%ifarch %{ix86} x86_64
+%endif # x86_64
+
+%ifarch x86_64
    pushd tools/power/x86/x86_energy_perf_policy/
    %{make}
    popd
    pushd tools/power/x86/turbostat
    %{make}
    popd
-%endif #turbostat/x86_energy_perf_policy
-%endif
+%endif # x86_64
+%endif # %ifarch %{cpupowerarchs}
+
 pushd tools/thermal/tmon/
 %{make}
 popd
-%endif
 
 # In the modsign case, we do 3 things.  1) We check the "flavour" and hard
 # code the value in the following invocations.  This is somewhat sub-optimal
@@ -1122,24 +935,14 @@ popd
 # grab the arch and invoke mod-sign.sh command to actually sign the modules.
 
 %define __modsign_install_post \
-  if [ "%{signmodules}" -eq "1" ]; then \
-    if [ "%{with_up}" -ne "0" ]; then \
-      %{modsign_cmd} certs/signing_key.pem.sign certs/signing_key.x509.sign $RPM_BUILD_ROOT/lib/modules/%{KVERREL}/ \
-    fi \
-  fi \
-  if [ "%{zipmodules}" -eq "1" ]; then \
-    find $RPM_BUILD_ROOT/lib/modules/ -type f -name '*.ko' | xargs xz; \
-  fi \
+  %{modsign_cmd} certs/signing_key.pem.sign certs/signing_key.x509.sign $RPM_BUILD_ROOT/lib/modules/%{KVERREL}/ \
+  find $RPM_BUILD_ROOT/lib/modules/ -type f -name '*.ko' | xargs xz; \
 %{nil}
 
 %define __spec_install_post \
   %{__arch_install_post}\
   %{__os_install_post}\
   %{__modsign_install_post}
-
-###
-### install
-###
 
 %install
 
@@ -1149,7 +952,6 @@ cd linux-%{KVERREL}
 # kernel headers_install will remove any header files in /usr/include that
 # it doesn't install itself.
 
-%if %{with_headers}
 # Install kernel headers
 make ARCH=%{hdrarch} INSTALL_HDR_PATH=$RPM_BUILD_ROOT/usr headers_install
 
@@ -1157,32 +959,26 @@ find $RPM_BUILD_ROOT/usr/include \
      \( -name .install -o -name .check -o \
      	-name ..install.cmd -o -name ..check.cmd \) | xargs rm -f
 
-%endif
-
-%if %{with_tools}
 %ifarch %{cpupowerarchs}
 %{make} -C tools/power/cpupower DESTDIR=$RPM_BUILD_ROOT libdir=%{_libdir} mandir=%{_mandir} CPUFREQ_BENCH=false install
 rm -f %{buildroot}%{_libdir}/*.{a,la}
 %find_lang cpupower
 mv cpupower.lang ../
-%ifarch %{ix86}
-    pushd tools/power/cpupower/debug/i386
-    install -m755 centrino-decode %{buildroot}%{_bindir}/centrino-decode
-    install -m755 powernow-k8-decode %{buildroot}%{_bindir}/powernow-k8-decode
-    popd
-%endif
+
 %ifarch x86_64
     pushd tools/power/cpupower/debug/x86_64
     install -m755 centrino-decode %{buildroot}%{_bindir}/centrino-decode
     install -m755 powernow-k8-decode %{buildroot}%{_bindir}/powernow-k8-decode
     popd
 %endif
+
 chmod 0755 %{buildroot}%{_libdir}/libcpupower.so*
 mkdir -p %{buildroot}%{_unitdir} %{buildroot}%{_sysconfdir}/sysconfig
 install -m644 %{SOURCE2000} %{buildroot}%{_unitdir}/cpupower.service
 install -m644 %{SOURCE2001} %{buildroot}%{_sysconfdir}/sysconfig/cpupower
 %endif
-%ifarch %{ix86} x86_64
+
+%ifarch x86_64
    mkdir -p %{buildroot}%{_mandir}/man8
    pushd tools/power/x86/x86_energy_perf_policy
    make DESTDIR=%{buildroot} install
@@ -1191,38 +987,23 @@ install -m644 %{SOURCE2001} %{buildroot}%{_sysconfdir}/sysconfig/cpupower
    make DESTDIR=%{buildroot} install
    popd
 %endif #turbostat/x86_energy_perf_policy
+
 pushd tools/thermal/tmon
 make INSTALL_ROOT=%{buildroot} install
 popd
-%endif
-
-%if %{with_bootwrapper}
-make DESTDIR=$RPM_BUILD_ROOT bootwrapper_install WRAPPER_OBJDIR=%{_libdir}/kernel-wrapper WRAPPER_DTSDIR=%{_libdir}/kernel-wrapper/dts
-%endif
-
-###
-### clean
-###
 
 %clean
 rm -rf $RPM_BUILD_ROOT
 
-###
-### scripts
-###
-
-%if %{with_tools}
+# scripts
 %post -n kernel-tools-libs
 /sbin/ldconfig
 
 %postun -n kernel-tools-libs
 /sbin/ldconfig
-%endif
 
-#
 # This macro defines a %%post script for a kernel*-devel package.
-#	%%kernel_devel_post [<subpackage>]
-#
+#   %%kernel_devel_post [<subpackage>]
 %define kernel_devel_post() \
 %{expand:%%post %{?1:%{1}-}devel}\
 if [ -f /etc/sysconfig/kernel ]\
@@ -1303,17 +1084,7 @@ fi}\
 %kernel_variant_preun
 %kernel_variant_post -r kernel-smp
 
-%kernel_variant_preun %{pae}
-%kernel_variant_post -v %{pae} -r (kernel|kernel-smp)
-
-%kernel_variant_post -v %{pae}debug -r (kernel|kernel-smp)
-%kernel_variant_preun %{pae}debug
-
-%kernel_variant_preun debug
-%kernel_variant_post -v debug
-
-if [ -x /sbin/ldconfig ]
-then
+if [ -x /sbin/ldconfig ]; then
     /sbin/ldconfig -X || exit $?
 fi
 
@@ -1321,58 +1092,28 @@ fi
 ### file lists
 ###
 
-%if %{with_headers}
 %files headers
 %defattr(-,root,root)
 /usr/include/*
-%endif
 
-%if %{with_bootwrapper}
-%files bootwrapper
-%defattr(-,root,root)
-/usr/sbin/*
-%{_libdir}/kernel-wrapper
-%endif
-
-%if %{with_perf}
-%files -n perf
-%defattr(-,root,root)
-%{_bindir}/perf
-%dir %{_libdir}/traceevent/plugins
-%{_libdir}/traceevent/plugins/*
-%dir %{_libexecdir}/perf-core
-%{_libexecdir}/perf-core/*
-%{_datadir}/perf-core/*
-%{_mandir}/man[1-8]/perf*
-%{_sysconfdir}/bash_completion.d/perf
-%doc linux-%{KVERREL}/tools/perf/Documentation/examples.txt
-
-%files -n python-perf
-%defattr(-,root,root)
-%{python_sitearch}
-
-%endif # with_perf
-
-%if %{with_tools}
 %files -n kernel-tools -f cpupower.lang
 %defattr(-,root,root)
 %ifarch %{cpupowerarchs}
 %{_bindir}/cpupower
-%ifarch %{ix86} x86_64
+%ifarch x86_64
 %{_bindir}/centrino-decode
 %{_bindir}/powernow-k8-decode
 %endif
 %{_unitdir}/cpupower.service
 %{_mandir}/man[1-8]/cpupower*
 %config(noreplace) %{_sysconfdir}/sysconfig/cpupower
-%ifarch %{ix86} x86_64
+%ifarch x86_64
 %{_bindir}/x86_energy_perf_policy
 %{_mandir}/man8/x86_energy_perf_policy*
 %{_bindir}/turbostat
 %{_mandir}/man8/turbostat*
 %endif
 %{_bindir}/tmon
-%endif
 
 %ifarch %{cpupowerarchs}
 %files -n kernel-tools-libs
@@ -1383,7 +1124,6 @@ fi
 %{_libdir}/libcpupower.so
 %{_includedir}/cpufreq.h
 %endif
-%endif # with_perf
 
 # empty meta-package
 %files
@@ -1444,5 +1184,4 @@ fi
 %endif\
 %{nil}
 
-
-%kernel_variant_files %{with_up}
+%kernel_variant_files 1
