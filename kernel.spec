@@ -56,9 +56,6 @@ Summary: The Linux kernel
 # should we do C=1 builds with sparse
 %define with_sparse    %{?_with_sparse:       1} %{?!_with_sparse:       0}
 %define with_cross 0
-#
-# build a release kernel on rawhide
-%define with_release   %{?_with_release:      1} %{?!_with_release:      0}
 
 %define debugbuildsenabled 0
 
@@ -221,7 +218,6 @@ Source18: mod-sign.sh
 Source99: filter-modules.sh
 %define modsign_cmd %{SOURCE18}
 
-Source19: Makefile.release
 Source20: Makefile
 Source21: config-debug
 Source22: config-nodebug
@@ -337,14 +333,6 @@ Requires: gzip binutils
 Kernel-bootwrapper contains the wrapper code which makes bootable "zImage"
 files combining both kernel and initial ramdisk.
 
-%package debuginfo-common-%{_target_cpu}
-Summary: Kernel source files used by %{name}-debuginfo packages
-Group: Development/Debug
-Provides: installonlypkg(kernel)
-%description debuginfo-common-%{_target_cpu}
-This package is required by %{name}-debuginfo subpackages.
-It provides the kernel source files common to all builds.
-
 %if %{with_perf}
 %package -n perf
 Summary: Performance monitoring for the Linux kernel
@@ -353,20 +341,6 @@ License: GPLv2
 %description -n perf
 This package contains the perf tool, which enables performance monitoring
 of the Linux kernel.
-
-%package -n perf-debuginfo
-Summary: Debug information for package perf
-Group: Development/Debug
-Requires: %{name}-debuginfo-common-%{_target_cpu} = %{version}-%{release}
-AutoReqProv: no
-%description -n perf-debuginfo
-This package provides debug information for the perf package.
-
-# Note that this pattern only works right to match the .build-id
-# symlinks because of the trailing nonmatching alternation and
-# the leading .*, because of find-debuginfo.sh's buggy handling
-# of matching the pattern against the symlinks file.
-%{expand:%%global debuginfo_args %{?debuginfo_args} -p '.*%%{_bindir}/perf(\.debug)?|.*%%{_libexecdir}/perf-core/.*|.*%%{_libdir}/traceevent/plugins/.*|XXX' -o perf-debuginfo.list}
 
 %package -n python-perf
 Summary: Python bindings for apps which will manipulate perf events
@@ -377,18 +351,6 @@ written in the Python programming language to use the interface
 to manipulate perf events.
 
 %{!?python_sitearch: %global python_sitearch %(%{__python} -c "from distutils.sysconfig import get_python_lib; print get_python_lib(1)")}
-
-%package -n python-perf-debuginfo
-Summary: Debug information for package perf python bindings
-Group: Development/Debug
-Requires: %{name}-debuginfo-common-%{_target_cpu} = %{version}-%{release}
-AutoReqProv: no
-%description -n python-perf-debuginfo
-This package provides debug information for the perf python bindings.
-
-# the python_sitearch macro should already be defined from above
-%{expand:%%global debuginfo_args %{?debuginfo_args} -p '.*%%{python_sitearch}/perf.so(\.debug)?|XXX' -o python-perf-debuginfo.list}
-
 
 %endif # with_perf
 
@@ -430,45 +392,10 @@ Provides: kernel-tools-devel
 This package contains the development files for the tools/ directory from
 the kernel source.
 
-%package -n kernel-tools-debuginfo
-Summary: Debug information for package kernel-tools
-Group: Development/Debug
-Requires: %{name}-debuginfo-common-%{_target_cpu} = %{version}-%{release}
-AutoReqProv: no
-%description -n kernel-tools-debuginfo
-This package provides debug information for package kernel-tools.
-
-# Note that this pattern only works right to match the .build-id
-# symlinks because of the trailing nonmatching alternation and
-# the leading .*, because of find-debuginfo.sh's buggy handling
-# of matching the pattern against the symlinks file.
-%{expand:%%global debuginfo_args %{?debuginfo_args} -p '.*%%{_bindir}/centrino-decode(\.debug)?|.*%%{_bindir}/powernow-k8-decode(\.debug)?|.*%%{_bindir}/cpupower(\.debug)?|.*%%{_libdir}/libcpupower.*|.*%%{_bindir}/turbostat(\.debug)?|.*%%{_bindir}/x86_energy_perf_policy(\.debug)?|.*%%{_bindir}/tmon(\.debug)?|XXX' -o kernel-tools-debuginfo.list}
-
 %endif # with_tools
 
-
-#
-# This macro creates a kernel-<subpackage>-debuginfo package.
-#	%%kernel_debuginfo_package <subpackage>
-#
-%define kernel_debuginfo_package() \
-%package %{?1:%{1}-}debuginfo\
-Summary: Debug information for package %{name}%{?1:-%{1}}\
-Group: Development/Debug\
-Requires: %{name}-debuginfo-common-%{_target_cpu} = %{version}-%{release}\
-Provides: %{name}%{?1:-%{1}}-debuginfo-%{_target_cpu} = %{version}-%{release}\
-Provides: installonlypkg(kernel)\
-AutoReqProv: no\
-%description %{?1:%{1}-}debuginfo\
-This package provides debug information for package %{name}%{?1:-%{1}}.\
-This is required to use SystemTap with %{name}%{?1:-%{1}}-%{KVERREL}.\
-%{expand:%%global debuginfo_args %{?debuginfo_args} -p '/.*/%%{KVERREL}%{?1:[+]%{1}}/.*|/.*%%{KVERREL}%{?1:\+%{1}}(\.debug)?' -o debuginfo%{?1}.list}\
-%{nil}
-
-#
 # This macro creates a kernel-<subpackage>-devel package.
-#	%%kernel_devel_package <subpackage> <pretty-name>
-#
+#   %%kernel_devel_package <subpackage> <pretty-name>
 %define kernel_devel_package() \
 %package %{?1:%{1}-}devel\
 Summary: Development package for building kernel modules to match the %{?2:%{2} }kernel\
@@ -487,10 +414,8 @@ This package provides kernel headers and makefiles sufficient to build modules\
 against the %{?2:%{2} }kernel package.\
 %{nil}
 
-#
 # This macro creates a kernel-<subpackage>-modules-extra package.
-#	%%kernel_modules_extra_package <subpackage> <pretty-name>
-#
+#   %%kernel_modules_extra_package <subpackage> <pretty-name>
 %define kernel_modules_extra_package() \
 %package %{?1:%{1}-}modules-extra\
 Summary: Extra kernel modules to match the %{?2:%{2} }kernel\
@@ -544,7 +469,7 @@ The meta-package for the %{1} kernel\
 %{nil}
 
 #
-# This macro creates a kernel-<subpackage> and its -devel and -debuginfo too.
+# This macro creates a kernel-<subpackage> and its -devel too.
 #	%%define variant_summary The Linux kernel compiled for <configuration>
 #	%%kernel_variant_package [-n <pretty-name>] <subpackage>
 #
@@ -561,53 +486,9 @@ Provides: installonlypkg(kernel)\
 %{expand:%%kernel_devel_package %{?1:%{1}} %{!?{-n}:%{1}}%{?{-n}:%{-n*}}}\
 %{expand:%%kernel_modules_package %{?1:%{1}} %{!?{-n}:%{1}}%{?{-n}:%{-n*}}}\
 %{expand:%%kernel_modules_extra_package %{?1:%{1}} %{!?{-n}:%{1}}%{?{-n}:%{-n*}}}\
-%{expand:%%kernel_debuginfo_package %{?1:%{1}}}\
 %{nil}
 
 # Now, each variant package.
-
-%ifnarch armv7hl
-%define variant_summary The Linux kernel compiled for PAE capable machines
-%kernel_variant_package %{pae}
-%description %{pae}-core
-This package includes a version of the Linux kernel with support for up to
-64GB of high memory. It requires a CPU with Physical Address Extensions (PAE).
-The non-PAE kernel can only address up to 4GB of memory.
-Install the kernel-PAE package if your machine has more than 4GB of memory.
-%else
-%define variant_summary The Linux kernel compiled for Cortex-A15
-%kernel_variant_package %{pae}
-%description %{pae}-core
-This package includes a version of the Linux kernel with support for
-Cortex-A15 devices with LPAE and HW virtualisation support
-%endif
-
-
-%define variant_summary The Linux kernel compiled with extra debugging enabled for PAE capable machines
-%kernel_variant_package %{pae}debug
-Obsoletes: kernel-PAE-debug
-%description %{pae}debug-core
-This package includes a version of the Linux kernel with support for up to
-64GB of high memory. It requires a CPU with Physical Address Extensions (PAE).
-The non-PAE kernel can only address up to 4GB of memory.
-Install the kernel-PAE package if your machine has more than 4GB of memory.
-
-This variant of the kernel has numerous debugging options enabled.
-It should only be installed when trying to gather additional information
-on kernel bugs, as some of these options impact performance noticably.
-
-
-%define variant_summary The Linux kernel compiled with extra debugging enabled
-%kernel_variant_package debug
-%description debug-core
-The kernel package contains the Linux kernel (vmlinuz), the core of any
-Linux operating system.  The kernel handles the basic functions
-of the operating system:  memory allocation, process allocation, device
-input and output, etc.
-
-This variant of the kernel has numerous debugging options enabled.
-It should only be installed when trying to gather additional information
-on kernel bugs, as some of these options impact performance noticably.
 
 # And finally the main -core package
 
@@ -618,7 +499,6 @@ The kernel package contains the Linux kernel (vmlinuz), the core of any
 Linux operating system.  The kernel handles the basic functions
 of the operating system: memory allocation, process allocation, device
 input and output, etc.
-
 
 %prep
 
@@ -785,14 +665,6 @@ git commit -a -m "Stable update"
 cp $RPM_SOURCE_DIR/config-* .
 cp %{SOURCE15} .
 
-%if !%{debugbuildsenabled}
-%if %{with_release}
-# The normal build is a really debug build and the user has explicitly requested
-# a release kernel. Change the config files into non-debug versions.
-make -f %{SOURCE19} config-release
-%endif
-%endif
-
 # Dynamically generate kernel .config files from config-* files
 make -f %{SOURCE20} VERSION=%{version} configs
 
@@ -830,9 +702,7 @@ touch .scmversion
 
 mkdir configs
 
-%if !%{debugbuildsenabled}
 rm -f kernel-%{version}-*debug.config
-%endif
 
 %define make make %{?cross_opts}
 
@@ -1224,11 +1094,6 @@ BuildKernel %make_target %kernel_image
 # make sure version-gen.sh is executable.
 chmod +x tools/power/cpupower/utils/version-gen.sh
 %{make} %{?_smp_mflags} -C tools/power/cpupower CPUFREQ_BENCH=false
-%ifarch %{ix86}
-    pushd tools/power/cpupower/debug/i386
-    %{make} %{?_smp_mflags} centrino-decode powernow-k8-decode
-    popd
-%endif
 %ifarch x86_64
     pushd tools/power/cpupower/debug/x86_64
     %{make} %{?_smp_mflags} centrino-decode powernow-k8-decode
@@ -1255,9 +1120,6 @@ popd
 # the one we saved off in BuildKernel above.  This is to make sure we're
 # signing the modules we actually built/installed in that flavour.  3) We
 # grab the arch and invoke mod-sign.sh command to actually sign the modules.
-#
-# We have to do all of those things _after_ find-debuginfo runs, otherwise
-# that will strip the signature off of the modules.
 
 %define __modsign_install_post \
   if [ "%{signmodules}" -eq "1" ]; then \
@@ -1270,20 +1132,7 @@ popd
   fi \
 %{nil}
 
-###
-### Special hacks for debuginfo subpackages.
-###
-
-# This macro is used by %%install, so we must redefine it before that.
-%define debug_package %{nil}
-
-#
-# Disgusting hack alert! We need to ensure we sign modules *after* all
-# invocations of strip occur, which is in __debug_install_post if
-# find-debuginfo.sh runs, and __os_install_post if not.
-#
 %define __spec_install_post \
-  %{?__debug_package:%{__debug_install_post}}\
   %{__arch_install_post}\
   %{__os_install_post}\
   %{__modsign_install_post}
