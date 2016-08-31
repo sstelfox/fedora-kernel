@@ -35,38 +35,18 @@ Summary: The Linux kernel
 %define _enable_debug_packages 0
 %define debuginfodir /usr/lib/debug
 
-%define all_x86 i386 i686
-
-# These arches install vdso/ directories.
-%define vdso_arches %{all_x86} x86_64
-
 # Overrides for generic default options
 
 # Per-arch tweaks
-
-%ifarch %{all_x86}
-%define asmarch x86
-%define hdrarch i386
-%define all_arch_configs kernel-%{version}-i?86*.config
-%define kernel_image arch/x86/boot/bzImage
-%endif
-
-%ifarch x86_64
 %define asmarch x86
 %define all_arch_configs kernel-%{version}-x86_64*.config
 %define kernel_image arch/x86/boot/bzImage
-%endif
-
-# Should make listnewconfig fail if there's config options printed out?
-%define listnewconfig_fail 1
 
 # Architectures we build tools/cpupower on
 %define cpupowerarchs x86_64
 
-#
 # Packages that need to be installed before the kernel is, because the %%post
 # scripts use them.
-#
 %define kernel_prereq  coreutils, systemd >= 203-2, /usr/bin/kernel-install
 %define initrd_prereq  dracut >= 027
 
@@ -76,7 +56,7 @@ License: GPLv2 and Redistributable, no modification permitted
 URL: http://www.kernel.org/
 Version: %{rpmversion}
 Release: %{pkg_release}
-ExclusiveArch: %{all_x86} x86_64
+ExclusiveArch: x86_64
 ExclusiveOS: Linux
 
 #
@@ -120,33 +100,8 @@ Source1000: config-local
 Source2000: cpupower.service
 Source2001: cpupower.config
 
-# Here should be only the patches up to the upstream canonical Linus tree.
-
 # For a stable release kernel
-%if 0%{?stable_update}
-%if 0%{?stable_base}
-%define    stable_patch_00  patch-4.%{base_sublevel}.%{stable_base}.xz
-Source5000: %{stable_patch_00}
-%endif
-
-# non-released_kernel case
-# These are automagically defined by the rcrev and gitrev values set up
-# near the top of this spec file.
-%else
-%if 0%{?rcrev}
-Source5000: patch-4.%{upstream_sublevel}-rc%{rcrev}.xz
-%if 0%{?gitrev}
-Source5001: patch-4.%{upstream_sublevel}-rc%{rcrev}-git%{gitrev}.xz
-%endif
-%else
-# pre-{base_sublevel+1}-rc1 case
-%if 0%{?gitrev}
-Source5000: patch-4.%{base_sublevel}-git%{gitrev}.xz
-%endif
-%endif
-%endif
-
-# build tweak for build ID magic, even for -vanilla
+Source5000: patch-4.%{base_sublevel}.%{stable_base}.xz
 Source5005: kbuild-AFTER_LINK.patch
 
 BuildRoot: %{_tmppath}/kernel-%{KVERREL}-root
@@ -542,12 +497,12 @@ do
   mv $i .config
   Arch=`head -1 .config | cut -b 3-`
   make ARCH=$Arch listnewconfig | grep -E '^CONFIG_' >.newoptions || true
-%if %{listnewconfig_fail}
+
   if [ -s .newoptions ]; then
     cat .newoptions
     exit 1
   fi
-%endif
+
   rm -f .newoptions
   make ARCH=$Arch oldnoconfig
   echo "# $Arch" > configs/$i
@@ -671,7 +626,6 @@ BuildKernel() {
     # we'll get it from the linux-firmware package and we don't want conflicts
     %{make} -s ARCH=$Arch INSTALL_MOD_PATH=$RPM_BUILD_ROOT modules_install KERNELRELEASE=$KernelVer mod-fw=
 
-%ifarch %{vdso_arches}
     %{make} -s ARCH=$Arch INSTALL_MOD_PATH=$RPM_BUILD_ROOT vdso_install KERNELRELEASE=$KernelVer
     if [ ! -s ldconfig-kernel.conf ]; then
       echo > ldconfig-kernel.conf "\
@@ -680,7 +634,6 @@ BuildKernel() {
     %{__install} -D -m 444 ldconfig-kernel.conf \
         $RPM_BUILD_ROOT/etc/ld.so.conf.d/kernel-$KernelVer.conf
     rm -rf $RPM_BUILD_ROOT/lib/modules/$KernelVer/vdso/.build-id
-%endif
 
     # And save the headers/makefiles etc for building modules against
     #
@@ -1163,10 +1116,8 @@ fi
 /lib/modules/%{KVERREL}%{?2:+%{2}}/build\
 /lib/modules/%{KVERREL}%{?2:+%{2}}/source\
 /lib/modules/%{KVERREL}%{?2:+%{2}}/updates\
-%ifarch %{vdso_arches}\
 /lib/modules/%{KVERREL}%{?2:+%{2}}/vdso\
 /etc/ld.so.conf.d/kernel-%{KVERREL}%{?2:+%{2}}.conf\
-%endif\
 /lib/modules/%{KVERREL}%{?2:+%{2}}/modules.*\
 %{expand:%%files -f kernel-%{?2:%{2}-}modules.list %{?2:%{2}-}modules}\
 %defattr(-,root,root)\
